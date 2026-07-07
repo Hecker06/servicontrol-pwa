@@ -445,14 +445,15 @@ export const TechOrderDetail: React.FC = () => {
           order_id: order.id,
           latitude: coords.latitude,
           longitude: coords.longitude,
-          address: address,
           is_target: false
         };
 
         if (existingLoc) {
-          await supabase.from('locations').update(locPayload).eq('id', existingLoc.id);
+          const { error: locError } = await supabase.from('locations').update(locPayload).eq('id', existingLoc.id);
+          if (locError) throw locError;
         } else {
-          await supabase.from('locations').insert([locPayload]);
+          const { error: locError } = await supabase.from('locations').insert([locPayload]);
+          if (locError) throw locError;
         }
       }
 

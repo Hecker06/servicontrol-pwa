@@ -349,14 +349,15 @@ export const OrderForm: React.FC = () => {
           order_id: orderId,
           latitude: targetLat,
           longitude: targetLng,
-          address: targetAddress,
           is_target: true
         };
 
         if (existingLoc) {
-          await supabase.from('locations').update(locPayload).eq('id', existingLoc.id);
+          const { error: locError } = await supabase.from('locations').update(locPayload).eq('id', existingLoc.id);
+          if (locError) throw locError;
         } else {
-          await supabase.from('locations').insert([locPayload]);
+          const { error: locError } = await supabase.from('locations').insert([locPayload]);
+          if (locError) throw locError;
         }
       } else if (isEdit) {
         // If edit and coordinates are cleared, delete target location
