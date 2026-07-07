@@ -1,0 +1,451 @@
+================================================================================
+REPORTE TÉCNICO MAESTRO Y DOCUMENTACIÓN DE IMPLEMENTACIÓN PARA ESTADÍAS 3.2
+      SISTEMA DE CONTROL DE ÓRDENES DE SERVICIO (SERVICONTROL PWA)
+================================================================================
+
+Este documento contiene la explicación técnica y detallada, paso a paso, para la
+redacción del apartado "3.2 Implementación de la mejora del sistema" del reporte
+de estadías de TSU en Tecnologías de la Información. La estructura y la prosa
+están alineadas con los requisitos y el estilo formal de los avances y el
+anteproyecto previos de la Universidad Tecnológica.
+
+--------------------------------------------------------------------------------
+ESTRUCTURA DEL DOCUMENTO MAESTRO:
+3.2 EXPLICACIÓN DETALLADA DE LA IMPLEMENTACIÓN DE LA MEJORA AL ÁREA
+    - Requerimientos Funcionales (Tabla 1)
+    - Requerimientos No Funcionales (Tabla 2)
+    - Propuesta de Solución y Arquitectura de Sistemas
+3.2.1 DISEÑO DETALLADO DE LA BASE DE DATOS EN SUPABASE (POSTGRESQL)
+    - Estructura de Tablas, Tipos de Datos y Relaciones
+    - Sentencias SQL DDL Completas y Explicación
+    - Row Level Security (RLS) y Políticas de Acceso Seguro
+    - Disparadores y Funciones en PL/pgSQL
+3.2.2 ARQUITECTURA GENERAL Y ESTRUCTURA DEL CÓDIGO FUENTE (FRONTEND VITE)
+    - Estructura de Directorios y Archivos del Proyecto
+    - Configuración del Compilador y Entorno de Trabajo
+3.2.3 SISTEMA DE AUTENTICACIÓN Y CONTEXTO GLOBAL DE ACCESO (AUTHCONTEXT.TSX)
+    - Ciclo de Sesión y Perfiles con Roles Sincronizados
+    - Enrutador Protegido (ProtectedRoute.tsx)
+3.2.4 DESARROLLO DE LA INTERFAZ DE ADMINISTRACIÓN (CRUD DE CLIENTES Y ÓRDENES)
+    - Registro de Clientes (Clients.tsx)
+    - Formulario de Registro y Modificación de Órdenes (OrderForm.tsx)
+    - Integración de Mapas de Destino (Leaflet) y Geocodificación Inversa
+3.2.5 PANEL ADMINISTRATIVO Y MONITOREO DE SERVICIOS (DASHBOARD.TSX)
+    - Vista General de KPI, Buscador, Filtros e Historial
+    - Modal Detallado de Control Técnico y Evidencias
+3.2.6 DESARROLLO DE LA VISTA DEL TÉCNICO EN CAMPO (TECH VIEWS)
+    - Dashboard del Técnico (Dashboard.tsx)
+    - Ficha de Servicio, Control GPS y Cierre Técnico (OrderDetail.tsx)
+3.2.7 LOGICA DE PWA, SERVICE WORKER Y SOPORTE OFFLINE-FIRST
+    - Estrategias de Caché y Manifiesto de Aplicación
+--------------------------------------------------------------------------------
+
+================================================================================
+3.2 EXPLICACIÓN DETALLADA DE LA IMPLEMENTACIÓN DE LA MEJORA AL ÁREA
+================================================================================
+Antes de proceder con el diseño e implementación técnica de la plataforma digital, se llevó a cabo un diagnóstico detallado del área de gestión y mantenimiento de infraestructura para identificar los cuellos de botella operativos y estructurar las necesidades específicas de los perfiles de usuario que interactúan con el servicio.
+
+Por una parte, las funciones de coordinación, planeación y supervisión general de la infraestructura demandan herramientas que permitan registrar de manera formal las solicitudes de atención de los clientes, calendarizar las intervenciones y asignar de manera controlada al personal operativo disponible. Para este perfil de control, resulta indispensable contar con un tablero de control en tiempo real que muestre el estado de avance de las órdenes de trabajo, así como con mecanismos de auditoría cartográfica que permitan confrontar la geolocalización programada de un servicio contra la ubicación física real en donde el operario ejecuta la actividad. Adicionalmente, este rol requiere administrar el catálogo de clientes, supervisar el stock disponible de insumos en el almacén central y consolidar la información histórica de las intervenciones para generar reportes administrativos y de calidad.
+
+Por otra parte, el personal encargado de la ejecución operativa de los servicios técnicos en campo requiere de una interfaz simplificada, de alta visibilidad en exteriores y optimizada para dispositivos móviles (teléfonos inteligentes o tabletas). Sus necesidades críticas se centran en visualizar con claridad y de manera directa la lista de tareas que le han sido asignadas en el día, acceder a la información de contacto y ubicación cartográfica del cliente, capturar coordenadas geográficas precisas al momento de iniciar y finalizar la intervención, reportar de forma sencilla los materiales del inventario que consumió, y registrar evidencias digitales (fotografías y observaciones escritas de cierre). Debido a que las intervenciones en campo se realizan con frecuencia en sótanos, laboratorios blindados o zonas geográficas con baja o nula cobertura de red celular, resulta prioritario que la solución integre mecanismos de persistencia local offline que garanticen que la información y las evidencias capturadas no se pierdan, permitiendo su sincronización automática una vez que el dispositivo detecte la restauración de la conectividad a internet.
+
+Posterior al análisis de estos requisitos de usuario, se realizó una valoración de alcance técnico considerando las condiciones tecnológicas y de presupuesto disponibles para el proyecto. Se determinó que, debido a las limitaciones financieras que impiden costear el uso de interfaces de programación (APIs) cartográficas comerciales de uso continuo (como Google Maps API) y al impacto negativo en la autonomía de la batería de los dispositivos móviles derivado del rastreo GPS persistente en segundo plano, no sería viable implementar un seguimiento geográfico en tiempo real de los trayectos de los operarios. En su lugar, se discernió como una solución técnica viable y altamente eficiente la integración de la API nativa de geolocalización de HTML5 para capturar el posicionamiento del dispositivo únicamente en el inicio y en el cierre del servicio, contrastando estos datos en un visor cartográfico basado en Leaflet y OpenStreetMap (de uso gratuito). Asimismo, en lugar de una aplicación móvil nativa con costos de desarrollo y publicación elevados, se optó por una Aplicación Web Progresiva (PWA) con Service Workers y manifiesto de aplicación, logrando así un entorno instalable y adaptado a móviles a un coste cero de licenciamiento.
+
+A continuación, se definen en las Tablas 1 y 2 los requerimientos funcionales y
+no funcionales del sistema desarrollados para cumplir con las metas operativas:
+
+REQUERIMIENTOS FUNCIONALES (RF)
+--------------------------------------------------------------------------------
+ID    | Requerimiento Funcional                    | Prioridad | Criterio de Aceptación
+--------------------------------------------------------------------------------
+RF1   | Autenticación de usuarios por Roles        | ALTA      | El inicio de sesión determina si el usuario accede como Admin o Técnico.
+RF2   | CRUD de Clientes                           | ALTA      | Registro de contactos para asociar a las órdenes de servicio.
+RF3   | CRUD de Órdenes de Servicio                | ALTA      | Formulario para crear y editar trabajos asignándoles cliente y técnico.
+RF4   | Asignación Geográfica de Destino           | ALTA      | El administrador marca la ubicación en un mapa y obtiene la dirección.
+RF5   | Carga de Imágenes de Referencia            | MEDIA     | El administrador sube imágenes guía asociadas a la orden.
+RF6   | Monitoreo de Estados (Dashboard Admin)     | ALTA      | Panel con KPIs que clasifica órdenes por su estado físico actual.
+RF7   | Listado de Tareas Asignadas (Técnico)      | ALTA      | El técnico ve únicamente los trabajos que tiene programados.
+RF8   | Registro de Geoposición Real (Técnico)     | ALTA      | Al iniciar y completar la tarea, el GPS del móvil captura la coordenada real.
+RF9   | Subida de Evidencia Fotográfica en Campo   | ALTA      | El técnico toma fotos que se suben al almacenamiento en la nube.
+RF10  | Cierre Técnico Obligatorio                 | ALTA      | No se permite completar la orden sin subir fotos y escribir observaciones.
+--------------------------------------------------------------------------------
+Tabla 1. Requerimientos funcionales del sistema ServiControl PWA.
+
+REQUERIMIENTOS NO FUNCIONALES (RNF)
+--------------------------------------------------------------------------------
+ID    | Requerimiento No Funcional                 | Prioridad | Criterio de Aceptación
+--------------------------------------------------------------------------------
+RNF1  | Instalabilidad y Responsividad PWA         | ALTA      | El frontend funciona como aplicación standalone e instalable en móviles.
+RNF2  | Seguridad en la Base de Datos (RLS)        | ALTA      | Ningún técnico puede acceder o modificar datos ajenos a su asignación.
+RNF3  | Rendimiento en Consultas                    | MEDIA     | Las consultas de historial y órdenes cargan en menos de 2 segundos.
+RNF4  | Cifrado de Comunicaciones y API            | ALTA      | Todas las peticiones usan HTTPS y las credenciales se ocultan en variables .env.
+RNF5  | Interfaz de Usuario Premium                | MEDIA     | La aplicación emplea un diseño oscuro con alto contraste para exteriores.
+RNF6  | Persistencia Estática                      | ALTA      | El Service Worker cachea los recursos estáticos del sistema.
+--------------------------------------------------------------------------------
+Tabla 2. Requerimientos no funcionales del sistema ServiControl PWA.
+
+PROPUESTA DE SOLUCIÓN Y ARQUITECTURA DE SISTEMAS
+La solución adoptada consiste en una aplicación web progresiva (PWA) de
+arquitectura desacoplada. El frontend corre del lado del navegador del cliente
+bajo React y se comunica de manera directa mediante peticiones HTTP seguras con
+los endpoints serverless que ofrece Supabase (base de datos relacional
+PostgreSQL, autenticación y storage de objetos). 
+
+================================================================================
+3.2.1 DISEÑO DETALLADO DE LA BASE DE DATOS EN SUPABASE (POSTGRESQL)
+================================================================================
+La base de datos se aloja en Supabase y está estructurada sobre el motor relacional
+PostgreSQL. El esquema consta de 6 tablas diseñadas para mantener la integridad
+referencial de las operaciones del sistema.
+
+ESTRUCTURA DE TABLAS Y RELACIONES (DICCIONARIO DE DATOS):
+1. **profiles**: Almacena los perfiles extendidos de usuarios.
+   - `id` (uuid, PK): Llave primaria que referencia a `auth.users(id)` con borrado en cascada.
+   - `email` (text): Dirección de correo.
+   - `name` (text): Nombre completo.
+   - `role` (text): Rol ('admin' o 'tecnico').
+   - `created_at` (timestamptz).
+
+2. **clients**: Datos de los clientes del servicio.
+   - `id` (uuid, PK): Autogenerado por `gen_random_uuid()`.
+   - `name` (text): Nombre del cliente o institución.
+   - `phone` (text): Teléfono de contacto.
+   - `created_at` (timestamptz).
+
+3. **service_orders**: Cabecera de la orden de servicio.
+   - `id` (uuid, PK).
+   - `client_id` (uuid, FK -> `clients.id` con borrado en cascada).
+   - `technician_id` (uuid, FK -> `profiles.id` con `on delete set null`).
+   - `status` (text): Estado ('Pendiente', 'Asignada', 'En progreso', 'Completada', 'Cancelada').
+   - `scheduled_at` (timestamptz): Fecha y hora del servicio.
+   - `description` (text): Detalles del trabajo.
+   - `created_at` (timestamptz).
+
+4. **evidences**: Almacena las URLs de las fotografías.
+   - `id` (uuid, PK).
+   - `order_id` (uuid, FK -> `service_orders.id` con borrado en cascada).
+   - `url` (text): Dirección pública del objeto en el bucket de storage.
+   - `is_reference` (boolean): true si es del administrador, false si es del técnico.
+   - `created_at` (timestamptz).
+
+5. **locations**: Coordenadas geográficas de los trabajos.
+   - `id` (uuid, PK).
+   - `order_id` (uuid, FK -> `service_orders.id` con borrado en cascada).
+   - `latitude` (numeric) y `longitude` (numeric).
+   - `address` (text): Dirección física obtenida por geocodificación.
+   - `is_target` (boolean): true si es destino, false si es la registrada por el técnico.
+   - `recorded_at` (timestamptz).
+
+6. **observations**: Comentarios técnicos de finalización o bitácora.
+   - `id` (uuid, PK).
+   - `order_id` (uuid, FK -> `service_orders.id` con borrado en cascada).
+   - `comment` (text).
+   - `created_at` (timestamptz).
+
+SENTENCIAS SQL DDL COMPLETAS PARA CREACIÓN DE BASE DE DATOS (MIGRACIÓN):
+```sql
+-- Habilitar extensión para UUIDs
+create extension if not exists "uuid-ossp";
+
+-- 1. Tabla de Perfiles de Usuario
+create table public.profiles (
+  id uuid references auth.users(id) on delete cascade primary key,
+  email text not null,
+  name text,
+  role text not null default 'tecnico' check (role in ('admin', 'tecnico')),
+  created_at timestamptz default now()
+);
+
+-- 2. Tabla de Clientes
+create table public.clients (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  phone text,
+  created_at timestamptz default now()
+);
+
+-- 3. Tabla de Órdenes de Servicio
+create table public.service_orders (
+  id uuid default gen_random_uuid() primary key,
+  client_id uuid references public.clients(id) on delete cascade not null,
+  technician_id uuid references public.profiles(id) on delete set null,
+  status text not null default 'Pendiente' check (status in ('Pendiente', 'Asignada', 'En progreso', 'Completada', 'Cancelada')),
+  scheduled_at timestamptz not null,
+  description text not null,
+  created_at timestamptz default now()
+);
+
+-- 4. Tabla de Evidencias Fotográficas
+create table public.evidences (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid references public.service_orders(id) on delete cascade not null,
+  url text not null,
+  is_reference boolean not null default false,
+  created_at timestamptz default now()
+);
+
+-- 5. Tabla de Ubicaciones
+create table public.locations (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid references public.service_orders(id) on delete cascade not null,
+  latitude numeric not null,
+  longitude numeric not null,
+  address text,
+  is_target boolean not null default false,
+  recorded_at timestamptz default now()
+);
+
+-- 6. Tabla de Observaciones
+create table public.observations (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid references public.service_orders(id) on delete cascade not null,
+  comment text not null,
+  created_at timestamptz default now()
+);
+```
+
+DISPARADORES Y LOGICA AUTOMATICA (TRIGGERS EN POSTGRESQL):
+Para asegurar que al registrarse un usuario a través de Supabase Auth se cree
+de inmediato su correspondiente perfil en `public.profiles` con su rol adecuado,
+se define el siguiente disparador en PL/pgSQL:
+```sql
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, name, role)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'name', ''),
+    coalesce(new.raw_user_meta_data->>'role', 'tecnico') -- Por defecto 'tecnico'
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create or replace trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+```
+
+SEGURIDAD DE FILA (ROW LEVEL SECURITY - RLS):
+Para evitar que usuarios externos o técnicos modificaran información de otros
+usuarios, se activa RLS en todas las tablas y se declaran políticas específicas:
+```sql
+-- Activar RLS en todas las tablas
+alter table public.profiles enable row level security;
+alter table public.clients enable row level security;
+alter table public.service_orders enable row level security;
+alter table public.evidences enable row level security;
+alter table public.locations enable row level security;
+alter table public.observations enable row level security;
+
+-- Políticas para profiles
+create policy "Cualquier usuario autenticado puede leer perfiles"
+  on public.profiles for select to authenticated using (true);
+create policy "Los usuarios pueden actualizar su propio perfil"
+  on public.profiles for update to authenticated using (auth.uid() = id);
+create policy "Solo los admins pueden insertar/borrar perfiles"
+  on public.profiles for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- Políticas para clients
+create policy "Cualquier usuario autenticado puede ver clientes"
+  on public.clients for select to authenticated using (true);
+create policy "Solo los admins pueden modificar clientes"
+  on public.clients for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+-- Políticas para service_orders
+create policy "Administradores tienen control total sobre órdenes"
+  on public.service_orders for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+create policy "Técnicos pueden leer sus órdenes asignadas"
+  on public.service_orders for select to authenticated using (technician_id = auth.uid());
+create policy "Técnicos pueden actualizar el estado de sus órdenes"
+  on public.service_orders for update to authenticated using (technician_id = auth.uid());
+
+-- Políticas para evidences
+create policy "Administradores tienen control total sobre evidencias"
+  on public.evidences for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+create policy "Técnicos pueden gestionar evidencias de sus órdenes"
+  on public.evidences for all to authenticated
+  using (exists (select 1 from public.service_orders s where s.id = evidences.order_id and s.technician_id = auth.uid()));
+
+-- Políticas para locations
+create policy "Administradores tienen control total sobre ubicaciones"
+  on public.locations for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+create policy "Técnicos pueden gestionar ubicaciones de sus órdenes"
+  on public.locations for all to authenticated
+  using (exists (select 1 from public.service_orders s where s.id = locations.order_id and s.technician_id = auth.uid()));
+
+-- Políticas para observations
+create policy "Administradores tienen control total sobre observaciones"
+  on public.observations for all to authenticated
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+create policy "Técnicos pueden gestionar observaciones de sus órdenes"
+  on public.observations for all to authenticated
+  using (exists (select 1 from public.service_orders s where s.id = observations.order_id and s.technician_id = auth.uid()));
+```
+
+================================================================================
+3.2.2 ARQUITECTURA GENERAL Y ESTRUCTURA DEL CÓDIGO FUENTE (FRONTEND VITE)
+================================================================================
+La aplicación de cliente está construida sobre Vite + React + TypeScript, lo que
+garantiza tiempos de respuesta mínimos y un tipado robusto. 
+
+ESTRUCTURA DE ARCHIVOS Y DIRECTORIOS DEL PROYECTO:
+```
+/estadias-prod
+├── .env                     # Archivo de variables de entorno de Supabase
+├── index.html               # Archivo base HTML, carga fuentes y estilos Leaflet
+├── package.json             # Dependencias del proyecto y scripts npm
+├── vite.config.ts           # Configuración de Vite con plugins Tailwind CSS v4 y PWA
+├── schema.sql               # Código SQL de la base de datos de producción
+├── src
+│   ├── main.tsx             # Punto de entrada de React
+│   ├── App.tsx              # Definición de rutas principales
+│   ├── App.css              # Estilos visuales del núcleo
+│   ├── index.css            # Estilos de Tailwind v4 y personalización de Leaflet
+│   ├── components
+│   │   ├── Navbar.tsx       # Barra de navegación premium con roles
+│   │   └── ProtectedRoute.tsx # Protector de rutas por perfiles y login
+│   ├── context
+│   │   └── AuthContext.tsx  # Contexto global de Supabase Auth y sesión
+│   ├── lib
+│   │   └── supabase.ts      # Cliente inicializador de conexión a Supabase
+│   └── pages
+│       ├── Login.tsx        # Login premium y registro
+│       ├── admin
+│       │   ├── Dashboard.tsx # Panel de control del administrador, KPIs e historial
+│       │   ├── Clients.tsx   # CRUD de clientes
+│       │   └── OrderForm.tsx # Creador/Editor de órdenes, mapas y asignaciones
+│       └── tech
+│           ├── Dashboard.tsx # Lista de órdenes asignadas al técnico
+│           └── OrderDetail.tsx # Ficha técnica de orden, fotos GPS y observaciones
+```
+
+CONFIGURACIÓN DE TSCONFIG.JSON (MODO VERBATIM MODULE SYNTAX):
+Debido a que el compilador de TypeScript está configurado con `"verbatimModuleSyntax": true`
+para optimizar la velocidad y compatibilidad en la compilación del navegador, 
+cualquier importación de interfaces y tipos debe declararse de manera explícita usando
+la palabra clave `type`.
+Esto previene que el transpilador de TypeScript mantenga referencias vacías o de tipo
+en el bundle compilado de JavaScript, reduciendo el peso final del código.
+
+================================================================================
+3.2.3 SISTEMA DE AUTENTICACIÓN Y CONTEXTO GLOBAL DE ACCESO (AUTHCONTEXT.TSX)
+================================================================================
+El manejo de sesiones de usuario recae en el proveedor de contexto `src/context/AuthContext.tsx`.
+
+LOGICA DE FUNCIONAMIENTO DE AUTHCONTEXT:
+1. Al cargar la aplicación, el SDK de Supabase escucha los cambios de sesión mediante
+   `supabase.auth.onAuthStateChange`.
+2. Al detectar un usuario autenticado, realiza una consulta a la tabla `profiles` usando
+   su identificador único (`auth.uid()`).
+3. Recupera el nombre y rol del usuario ('admin' o 'tecnico') y los guarda en el
+   estado de React `profile`.
+4. El frontend utiliza este contexto para saber qué tipo de dashboard renderizar.
+
+ENRUTADOR DE RUTAS PROTEGIDAS (`src/components/ProtectedRoute.tsx`):
+Para evitar accesos manuales editando la URL, el componente `ProtectedRoute`
+valida que el rol del usuario esté incluido en el arreglo de roles permitidos
+(`allowedRoles`). De lo contrario, redirige al Dashboard correspondiente o a la
+pantalla de login:
+```typescript
+if (loading) return <LoadingSpinner />;
+if (!user) return <Navigate to="/login" replace />;
+if (allowedRoles && !allowedRoles.includes(profile?.role || '')) {
+  return <Navigate to="/" replace />;
+}
+return <>{children}</>;
+```
+
+================================================================================
+3.2.4 DESARROLLO DE LA INTERFAZ DE ADMINISTRACIÓN (CRUD DE CLIENTES Y ÓRDENES)
+================================================================================
+La interfaz para administradores está dividida en vistas modulares orientadas
+a agilizar el trabajo.
+
+CRUD DE CLIENTES (CLIENTS.TSX):
+Es una interfaz limpia que permite la gestión de los datos de contacto de los
+clientes, necesaria para asociar nombres e instituciones a los servicios técnicos.
+
+FORMULARIO DE REGISTRO Y ASIGNACIÓN DE ÓRDENES (ORDERFORM.TSX):
+- **Carga de Datos**: Al cargar, obtiene los clientes de `clients` y perfiles de técnicos
+  (profiles con role 'tecnico') asíncronamente desde Supabase.
+- **Selector Cartográfico Leaflet**: Implementa un contenedor `MapContainer` en el
+  cual el administrador hace clic sobre las calles para programar la ubicación del trabajo.
+  El evento de clic es manejado por el componente `MapClickHandler` que lanza una petición
+  de geocodificación inversa a OpenStreetMap Nominatim:
+  `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+  La dirección legible devuelta se muestra y almacena en el campo `address`.
+
+================================================================================
+3.2.5 PANEL ADMINISTRATIVO Y MONITOREO DE SERVICIOS (DASHBOARD.TSX)
+================================================================================
+El Dashboard del administrador (`src/pages/admin/Dashboard.tsx`) sirve como
+centro de operaciones.
+
+KPIS Y FILTROS INTERACTIVOS:
+Al iniciar, consulta la totalidad de las órdenes. Calcula KPIs superiores:
+- Órdenes Totales.
+- Pendientes (sin técnico asignado).
+- Asignadas (con técnico pero sin iniciar).
+- En Curso (técnico trabajando en el sitio).
+- Completadas (finalizadas y con evidencias).
+La tabla inferior permite realizar búsquedas dinámicas en base a texto (cliente,
+técnico, descripción) y filtrar por pestañas de estado de forma instantánea.
+
+MODAL DETALLADO DE CONTROL TÉCNICO:
+Al seleccionar una orden, se abre un modal lateral que carga asíncronamente:
+- Las fotos de referencia (cargadas por el administrador al crear el servicio).
+- Las fotos de evidencia del técnico tomadas in-situ.
+- Las observaciones escritas.
+- Un mapa con dos marcadores: uno rojo que define la posición de destino donde
+  debía hacerse el servicio y uno azul con la posición geográfica real desde la
+  cual el técnico cerró la tarea en su dispositivo móvil. Esto permite al
+  supervisor validar si el trabajo se realizó físicamente en el lugar indicado.
+
+================================================================================
+3.2.6 DESARROLLO DE LA VISTA DEL TÉCNICO EN CAMPO (TECH VIEWS)
+================================================================================
+Los técnicos operan desde smartphones en exteriores, por lo que su interfaz
+está diseñada bajo criterios de usabilidad móvil ("mobile-first").
+
+DASHBOARD DEL TÉCNICO (DASHBOARD.TSX):
+Es un listado sencillo de órdenes asignadas a su identificador de usuario 
+(`technician_id = auth.uid()`). Las tarjetas están ordenadas por fecha y se
+colorean según su prioridad o estado para facilitar la visualización.
+
+FICHA DE SERVICIO, CONTROL GPS Y CIERRE TÉCNICO (ORDERDETAIL.TSX):
+1. **Inicio de Servicio**: Al abrir la orden en estado "Asignada", el técnico
+   presiona "Iniciar Servicio". La aplicación solicita la geolocalización en
+   tiempo real usando el GPS del celular (`navigator.geolocation.getCurrentPosition`)
+   y cambia el estado de la orden a "En progreso".
+2. **Subida de Evidencias**: Cuenta con un botón que dispara la cámara del celular
+   (`capture="environment"`). La foto es enviada a Supabase Storage y su URL se guarda.
+3. **Cierre de Orden**: Para completar el servicio, el técnico debe redactar una 
+   observación. El sistema valida obligatoriamente que exista al menos una foto de 
+   evidencia y las observaciones completas. Al presionar "Completar Servicio", se 
+   captura la geolocalización de cierre y la orden se actualiza a "Completada".
+
+================================================================================
+3.2.7 LOGICA DE PWA, SERVICE WORKER Y SOPORTE OFFLINE-FIRST
+================================================================================
+La conversión de ServiControl a aplicación nativa e instalable se gestiona mediante 
+`vite-plugin-pwa` en `vite.config.ts`.
+
+ESTRATEGIA DE CACHÉ DEL SERVICE WORKER:
+- **Precache**: Registra y almacena localmente en el navegador los activos estáticos 
+  del bundle generado (`dist/assets/index.js`, `dist/assets/index.css`, `index.html`, 
+  `logo.jpg`, etc.).
+- **Navegación offline**: Si no hay internet, el Service Worker sirve los recursos 
+  desde la caché interna, logrando que el sistema cargue instantáneamente y funcione 
+  sin señal.
+- **Manifiesto Web**: Define la identidad visual (nombre, colores oscuros de fondo, 
+  ícono de aplicación) para que navegadores móviles muestren el cartel de
+  "Instalar aplicación en la pantalla de inicio".
+================================================================================

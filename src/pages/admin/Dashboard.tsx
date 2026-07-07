@@ -4,8 +4,9 @@ import { supabase } from '../../lib/supabase';
 import { Navbar } from '../../components/Navbar';
 import { 
   Plus, Users, ClipboardList, CheckCircle2, AlertCircle, Clock, Eye, 
-  MapPin, X, Calendar, User, Phone, FileText, Pencil 
+  MapPin, X, Calendar, User, Phone, FileText, Pencil, Package 
 } from 'lucide-react';
+import { inventoryDb, type OrderItem } from '../../lib/inventoryDb';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -58,6 +59,7 @@ export const AdminDashboard: React.FC = () => {
   const [selectedTargetLocation, setSelectedTargetLocation] = useState<LocationCoords | null>(null);
   const [selectedActualLocation, setSelectedActualLocation] = useState<LocationCoords | null>(null);
   const [selectedObservations, setSelectedObservations] = useState<{ comment: string; created_at: string }[]>([]);
+  const [selectedMaterials, setSelectedMaterials] = useState<OrderItem[]>([]);
   const [loadingModalData, setLoadingModalData] = useState(false);
 
   const navigate = useNavigate();
@@ -155,6 +157,10 @@ export const AdminDashboard: React.FC = () => {
         .eq('order_id', order.id)
         .order('created_at', { ascending: true });
       setSelectedObservations(obsData || []);
+
+      // Fetch materials
+      const materialsData = await inventoryDb.getOrderItems(order.id);
+      setSelectedMaterials(materialsData || []);
 
     } catch (err) {
       console.error('Error fetching modal details:', err);
@@ -495,6 +501,29 @@ export const AdminDashboard: React.FC = () => {
                                   second: '2-digit',
                                 })}
                               </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Materials utilized list */}
+                    <div className="space-y-2 border-t border-slate-800/80 pt-4">
+                      <h4 className="text-sm font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 font-sans">
+                        <Package className="w-4 h-4" />
+                        Insumos y Materiales Utilizados
+                      </h4>
+                      {selectedMaterials.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic">No se han registrado materiales consumidos en esta orden.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                          {selectedMaterials.map((mat) => (
+                            <div key={mat.id} className="bg-slate-950/40 border border-slate-800/60 p-3 rounded-xl flex items-center justify-between text-xs">
+                              <div>
+                                <p className="font-semibold text-slate-200">{mat.inventory_items?.name || 'Insumo'}</p>
+                                <p className="text-slate-500 text-[10px] mt-0.5">{mat.inventory_items?.unit || 'unidad'}</p>
+                              </div>
+                              <span className="font-bold text-indigo-400 text-sm">{mat.quantity}</span>
                             </div>
                           ))}
                         </div>

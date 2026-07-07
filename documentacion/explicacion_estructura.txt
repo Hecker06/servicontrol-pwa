@@ -1,0 +1,173 @@
+================================================================================
+                    ESTRUCTURA GENERAL DEL PROYECTO: SERVICONTROL PWA
+================================================================================
+
+Este documento proporciona una guía detallada y explicativa de cada una de las 
+carpetas y archivos que componen el proyecto "ServiControl PWA", una aplicación 
+web progresiva para la gestión de órdenes de servicio en una entidad 
+universitaria, con soporte para asignación de técnicos, registro de evidencias 
+fotográficas con geolocalización y sincronización con Supabase.
+
+--------------------------------------------------------------------------------
+1. DIRECTORIOS Y CARPETAS PRINCIPALES (RAÍZ)
+--------------------------------------------------------------------------------
+
+* .git/
+  Carpeta oculta del sistema de control de versiones Git. Contiene todo el 
+  historial de cambios del código, ramas (branches) y configuración de 
+  sincronización con repositorios remotos como GitHub. No debe modificarse 
+  manualmente.
+
+* .vs/
+  Carpeta oculta generada automáticamente por Microsoft Visual Studio o Visual 
+  Studio Code. Almacena metadatos temporales, configuraciones del espacio de 
+  trabajo y preferencias de edición propias del usuario actual.
+
+* dist/
+  Contiene los archivos listos para producción. Es el resultado del proceso de 
+  compilación (ejecutado con el comando `npm run build`). Contiene código HTML, 
+  CSS y JS minimizado, optimizado y comprimido para ser desplegado en hosting 
+  (como Vercel, Netlify o servidores Apache/Nginx).
+
+* documentacion/
+  Directorio que recopila la documentación técnica del proyecto, guías de diseño, 
+  definiciones del modelo de datos, explicaciones de algoritmos clave y prompts 
+  de IA utilizados durante el desarrollo.
+
+* node_modules/
+  Contiene todos los paquetes y librerías externas descargados mediante npm. 
+  Esta carpeta se genera al ejecutar `npm install` basándose en las dependencias 
+  definidas en `package.json`. No se incluye en el control de versiones (.git).
+
+* public/
+  Carpeta para archivos estáticos que se sirven directamente en la raíz de la 
+  aplicación sin pasar por el compilador de Vite. Contiene elementos esenciales 
+  para la PWA como:
+    - manifest.json: Define el nombre, íconos y colores para instalar la app.
+    - favicon.ico e íconos: Recursos gráficos utilizados para la identidad de la app.
+    - _redirects / vercel.json: Configuraciones de redirección de rutas de hosting.
+
+* src/
+  La carpeta más importante del frontend. Alberga todo el código fuente de la 
+  aplicación React + TypeScript. En su interior se estructuran los componentes, 
+  páginas, contextos de estado global, integraciones de bases de datos y estilos.
+
+--------------------------------------------------------------------------------
+2. ARCHIVOS SUELTOS EN LA RAÍZ DEL PROYECTO
+--------------------------------------------------------------------------------
+
+* .env
+  Archivo local para definir variables de entorno y configuración sensible del 
+  entorno de desarrollo, tales como las credenciales de conexión públicas de 
+  Supabase (`VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`). Nunca se sube a 
+  producción ni a Git por razones de seguridad.
+
+* .gitignore
+  Archivo de configuración de Git. Le indica al control de versiones qué archivos 
+  o directorios no deben guardarse ni subirse al repositorio (como node_modules, 
+  archivos .env, configuraciones locales .vs, o compilaciones temporales dist).
+
+* .oxlintrc.json
+  Archivo de configuración de Oxlint, una herramienta de análisis estático (linter) 
+  extremadamente rápida escrita en Rust. Se utiliza en el proyecto para validar 
+  reglas de código limpio y prevenir errores sintácticos o de buenas prácticas 
+  en React y TypeScript.
+
+* 3.2_ServiControl_desde_base_de_datos_final.docx
+  Documento de Microsoft Word que contiene el avance o borrador formal de la 
+  documentación del capítulo 3.2 del proyecto de estadías del estudiante. 
+  Describe la base de datos y la integración tecnológica.
+
+* Anteproyecto estadias.doc
+  Documento original de Word que presenta la propuesta inicial del anteproyecto 
+  de estadías universitarias. Define objetivos iniciales, justificación y alcance.
+
+* README.md
+  Documento en formato Markdown que ofrece una introducción al proyecto, 
+  instrucciones básicas para inicializar el entorno de desarrollo local 
+  (`npm install` y `npm run dev`) y guías sobre cómo expandir la configuración.
+
+* blueprint.md
+  Es una especificación detallada o plano ("blueprint") del diseño técnico del 
+  sistema. Incluye estructuras de componentes, relaciones, flujo de datos y 
+  arquitectura general antes de su desarrollo detallado.
+
+* index.html
+  Es el punto de entrada HTML de la aplicación web de una sola página (SPA). 
+  Contiene la estructura básica de la página, la vinculación a los estilos y 
+  carga el script `src/main.tsx` que arranca la interfaz dinámica de React.
+
+* package-lock.json
+  Generado automáticamente por npm. Registra el árbol de dependencias exacto e 
+  idéntico que se instaló en el proyecto, asegurando que cualquier otro 
+  desarrollador instale exactamente las mismas versiones de las librerías.
+
+* package.json
+  Define la configuración del proyecto Node.js. Lista los metadatos del proyecto, 
+  los comandos/scripts ejecutables (`dev`, `build`, `lint`, `preview`), y todas 
+  las dependencias requeridas (React, Lucide React, Supabase, Tailwind, etc.).
+
+* prd.md
+  Documento de Requisitos del Producto (Product Requirements Document). Describe 
+  las necesidades del negocio, perfiles de usuario, casos de uso detallados, 
+  requerimientos funcionales, no funcionales y el plan de desarrollo de la app.
+
+* schema.sql
+  Archivo de comandos SQL con el esquema de la base de datos relacional de Supabase. 
+  Contiene las sentencias `CREATE TABLE`, `CREATE TRIGGER`, relaciones de llaves 
+  foráneas, índices y las políticas RLS (Row Level Security) para el acceso seguro.
+
+* tsconfig.json
+  Archivo maestro de configuración de TypeScript para todo el proyecto. 
+  Establece cómo se deben transpilar los archivos de JS/TS modernos a versiones 
+  compatibles con el navegador.
+
+* tsconfig.app.json
+  Configuración específica del compilador TypeScript aplicada al código fuente de 
+  la aplicación web dentro de la carpeta `src/`.
+
+* tsconfig.node.json
+  Configuración específica del compilador TypeScript para el código utilizado en 
+  las herramientas de compilación que se ejecutan directamente en Node (como 
+  `vite.config.ts`).
+
+* vite.config.ts
+  Archivo de configuración de Vite. Define el servidor de desarrollo, puertos, 
+  y los plugins activos de la compilación, incluyendo el compilador de React 
+  y soporte para PWA (Progressive Web App).
+
+* walkthrough.md
+  Guía de recorrido o bitácora técnica de cambios. Documenta las funcionalidades 
+  que han sido implementadas en el proyecto y los pasos que se siguieron para 
+  verificar o probar su correcto funcionamiento.
+
+--------------------------------------------------------------------------------
+3. EXPLICACIÓN DE SUBCARPETAS CLAVE
+--------------------------------------------------------------------------------
+
+A. DENTRO DE LA CARPETA `src/`:
+   - src/assets/     : Carpeta para guardar logos, íconos y fotos integrados en el código.
+   - src/components/ : Componentes UI reutilizables (formularios, layouts, botones).
+   - src/context/    : Contextos de React para manejar estados compartidos (ej. login del usuario).
+   - src/lib/        : Inicialización del cliente de Supabase (`supabaseClient.ts`).
+   - src/pages/      : Las pantallas principales (Dashboard, Login, Órdenes, etc.).
+   - src/App.tsx     : Configura las rutas del sistema y define la estructura base.
+   - src/main.tsx    : Monta el árbol de React en el DOM HTML.
+   - src/index.css   : Contiene estilos CSS generales y variables globales de estilo.
+
+B. DENTRO DE LA CARPETA `documentacion/`:
+   - 1_arquitectura_y_diseno.txt        : Manual técnico de estructura y patrones de diseño.
+   - 2_modelo_datos_y_seguridad.txt     : Detalle de bases de datos y control de accesos (RLS).
+   - 3_flujo_funcionamiento_paso_a_paso.: Guía de uso completo de la app.
+   - explicacion_db_trigger.txt         : Guía del funcionamiento de automatizaciones en la BD.
+   - explicacion_order_detail_tech.txt  : Documentación técnica del módulo de detalles de órdenes.
+   - explicacion_order_form_nominatim.txt: Documentación técnica del geocodificador Nominatim.
+   - explicacion_pwa_config.txt        : Detalles de la configuración y Service Worker de la PWA.
+   - explicacion_routing_protection.txt: Detalle del sistema de guardias y protección de rutas.
+   - manual_tecnico_maestro.txt         : Documento técnico integral del sistema.
+   - capturas/                          : Almacenamiento de capturas de pantalla de evidencias.
+   - prompt_*                           : Registros de prompts recomendados para interactuar con IA.
+
+================================================================================
+                                FIN DEL DOCUMENTO
+================================================================================

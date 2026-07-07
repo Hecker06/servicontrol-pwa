@@ -1,0 +1,38 @@
+================================================================================
+EXPLICACIÓN TÉCNICA: CONFIGURACIÓN PWA Y ESTRATEGIA DE CACHÉ DE RECURSOS
+================================================================================
+
+Este bloque de código, implementado en el archivo de empaquetado y construcción
+de Vite (`vite.config.ts`), describe la inyección de capacidades PWA (Progressive
+Web Application) para permitir que la aplicación se comporte de forma nativa.
+
+FUNCIONAMIENTO PASO A PASO:
+1. **Registro del Plugin `VitePWA`**:
+   - Inyecta el plugin oficial de PWA en el proceso de transpilación de Vite.
+   - Configura la opción `registerType: 'autoUpdate'`, lo que le indica al Service
+     Worker que debe autodescargar y refrescar de inmediato en el navegador del
+     usuario cuando se publique una nueva compilación del frontend en producción.
+
+2. **Caché de Recursos Estáticos (`includeAssets`)**:
+   - Declara una lista de archivos críticos (favicon, iconos, fuentes) que el
+     Service Worker debe precargar e interceptar localmente en el navegador.
+   - Esto hace que, en caso de pérdida de conexión de red en campo, el Service Worker
+     sirva estos archivos de inmediato desde la memoria local en lugar de realizar
+     peticiones fallidas al servidor web, permitiendo que la interfaz web del sistema
+     cargue de manera instantánea.
+
+3. **Declaración del Manifiesto Web (`manifest`)**:
+   - Estructura el JSON de metadatos del manifiesto (`manifest.webmanifest`),
+     especificando:
+     * Nombre y nombre corto de la app (`name`, `short_name`).
+     * `theme_color`: El color de fondo del tema en hexadecimal (`#020617`, slate-950)
+       que el navegador móvil pintará en la barra superior.
+     * Arreglo de íconos con diferentes resoluciones (`pwa-192x192.png`, `pwa-512x512.png`)
+       para mostrar el logotipo de ServiControl en la pantalla de inicio del celular.
+
+BENEFICIO OPERATIVO:
+Convierte la aplicación web en una aplicación de instalación nativa en sistemas
+operativos Windows, Android e iOS (ocultando la barra del navegador de internet y
+operando en modo standalone), y habilita la disponibilidad constante de la interfaz
+incluso en zonas sin señal de red celular.
+================================================================================

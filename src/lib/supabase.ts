@@ -10,3 +10,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Exponer supabase en el objeto global window para permitir pruebas desde la consola del navegador
+if (typeof window !== 'undefined') {
+  (window as any).supabase = supabase;
+}
+

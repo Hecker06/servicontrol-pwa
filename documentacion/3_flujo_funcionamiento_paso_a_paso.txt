@@ -1,0 +1,151 @@
+================================================================================
+SERVICONTROL PWA - DOCUMENTACIÓN TÉCNICA
+PARTE 3: FLUJO DE FUNCIONAMIENTO PASO A PASO
+================================================================================
+
+Este documento describe detalladamente los flujos operativos paso a paso dentro
+de la aplicación "ServiControl PWA", abarcando el ciclo de vida completo de una 
+orden de servicio, desde el registro de usuarios hasta el cierre del servicio 
+con evidencias de geolocalización.
+
+--------------------------------------------------------------------------------
+FLUJO A: REGISTRO DE USUARIOS Y AUTENTICACIÓN
+--------------------------------------------------------------------------------
+1. El usuario accede a la URL de la aplicación web y es redirigido a la pantalla 
+   de inicio de sesión (`/login`) mediante el componente `ProtectedRoute`.
+2. Si el usuario no tiene una cuenta creada:
+   a. Hace clic en el botón de cambio de modo en el formulario ("¿No tienes una 
+      cuenta? Regístrate").
+   b. Introduce su nombre, correo electrónico, contraseña y selecciona su rol 
+      operativo ('admin' o 'tecnico') mediante un selector visual.
+   c. Hace clic en "Crear cuenta".
+3. El frontend invoca la función `supabase.auth.signUp()` enviando las 
+   credenciales y guardando el nombre y rol elegido en los metadatos del usuario.
+4. Supabase Auth crea el registro interno. En respuesta, se dispara el trigger 
+   `on_auth_user_created` en PostgreSQL, que ejecuta la función `handle_new_user()`
+   para insertar automáticamente la réplica en la tabla pública `profiles`.
+5. Si el usuario ya posee una cuenta:
+   a. Introduce sus credenciales (email y contraseña) y presiona "Iniciar sesión".
+   b. El frontend invoca `supabase.auth.signInWithPassword()`.
+   c. Al autenticarse con éxito, el proveedor global `AuthContext.tsx` captura la
+      sesión activa, consulta la tabla `profiles` para obtener el rol del usuario,
+      y actualiza el estado global de la aplicación.
+6. El enrutador redirige de manera automática usando el componente 
+   `RoleBasedRedirect`:
+   - Usuarios con rol 'admin' -> redirigidos a `/admin` (Dashboard del Administrador).
+   - Usuarios con rol 'tecnico' -> redirigidos a `/tech` (Dashboard del Técnico).
+
+--------------------------------------------------------------------------------
+FLUJO B: PANEL DE ADMINISTRACIÓN (ADMINISTRADOR)
+--------------------------------------------------------------------------------
+El Administrador se encarga de gestionar la base operativa de la aplicación:
+
+Paso 1: CRUD de Clientes
+1. El Administrador hace clic en la sección "Clientes" de la barra de navegación.
+2. Accede a `/admin/clients` donde se presenta un listado interactivo con todos 
+   los clientes registrados.
+3. Para registrar un nuevo cliente, hace clic en "Nuevo Cliente", completa un
+   formulario modal con el nombre y teléfono de contacto, y hace clic en "Guardar".
+4. El sistema realiza un insert directo a la tabla `public.clients`. El listado se
+   actualiza de forma reactiva sin necesidad de recargar la página.
+
+Paso 2: Registro de Órdenes de Servicio
+1. El Administrador accede a la sección "Órdenes" y hace clic en "+ Nueva Orden".
+2. Es redirigido al formulario `/admin/orders/new`.
+3. Completa los campos solicitados:
+   - Cliente: Un menú desplegable cargado dinámicamente desde `public.clients`.
+   - Técnico asignado: Un menú desplegable cargado dinámicamente desde la tabla 
+     `profiles` filtrando a los usuarios con rol 'tecnico'.
+   - Fecha y hora de programación del servicio.
+   - Descripción: Detalle pormenorizado del problema o tarea requerida.
+4. Al hacer clic en "Guardar", el sistema realiza la inserción en la tabla
+   `public.service_orders`. El estado por defecto se establece en "Asignada" si 
+   se seleccionó un técnico, o en "Pendiente" si se dejó vacío.
+5. El administrador regresa al Dashboard principal.
+
+Paso 3: Dashboard de Monitoreo y Mapas
+1. El Administrador visualiza indicadores clave en tiempo real en `/admin`:
+   - Órdenes Totales, Pendientes, En Proceso y Completadas.
+2. Dispone de un buscador de texto y filtros rápidos para buscar órdenes por 
+   técnico, estado o rango de fechas.
+3. Al seleccionar una orden completada:
+   - Se abre un modal de inspección detallado.
+   - Se consulta la tabla `evidences` para recuperar las fotografías subidas.
+   - Se consulta la tabla `locations` para extraer las coordenadas registradas.
+   - Utilizando la librería Leaflet, el modal dibuja un mapa interactivo de
+     OpenStreetMap en el que coloca marcadores:
+     * Un marcador azul para señalar la ubicación aproximada del cliente.
+     * Un marcador verde o rojo para indicar la ubicación GPS exacta desde donde
+       el técnico de campo capturó la evidencia fotográfica.
+     * Esto permite al administrador validar físicamente que el técnico estuvo 
+       presente en el lugar para resolver el servicio.
+
+--------------------------------------------------------------------------------
+FLUJO C: PANEL DE TRABAJO DE CAMPO (TÉCNICO DE SERVICIO)
+--------------------------------------------------------------------------------
+El técnico interactúa con una interfaz optimizada para teléfonos móviles y tablets:
+
+Paso 1: Lista de Tareas Asignadas
+1. El técnico accede al Dashboard `/tech`.
+2. RLS de Supabase filtra de manera automática la consulta a la base de datos, 
+   mostrando en pantalla única y exclusivamente las órdenes donde 
+   `technician_id` coincide con su identificador de sesión activa (`auth.uid()`).
+3. El técnico ve dos secciones claramente diferenciadas:
+   - "Servicios Activos" (Estados: Asignada, En progreso).
+   - "Historial" (Estados: Completada, Cancelada).
+
+Paso 2: Detalles e Inicio del Trabajo
+1. El técnico selecciona una orden activa haciendo clic sobre ella.
+2. Es redirigido al detalle `/tech/orders/:id`.
+3. Visualiza la descripción, datos de contacto del cliente y el estado actual.
+4. El técnico hace clic en el botón interactivo "Iniciar Servicio".
+5. El sistema cambia el estado de la orden a "En progreso" en la base de datos
+   y la interfaz actualiza los controles disponibles para el técnico.
+
+Paso 3: Captura de Geolocalización y Evidencias Fotográficas
+1. Una vez en el lugar del servicio y habiendo completado el trabajo técnico:
+   a. El técnico hace clic en "Capturar Evidencia Foto".
+   b. El navegador solicita permiso de acceso a la cámara y a la ubicación física
+      del dispositivo (API Geolocation de HTML5).
+   c. El técnico toma la fotografía o la selecciona de la galería.
+   d. El frontend recupera de forma simultánea la latitud y longitud provistas por 
+      el GPS del dispositivo y procesa la imagen para prepararla para la subida.
+
+Paso 4: Subida de Datos a Supabase
+1. El sistema genera un identificador único para el archivo de imagen.
+2. Invoca `supabase.storage.from('evidences').upload()` enviando el archivo binario
+   al bucket correspondiente.
+3. Tras una subida exitosa, el sistema obtiene la URL pública de la imagen.
+4. Inserta un registro en la tabla `public.evidences` con la URL de la foto y el
+   ID de la orden.
+5. Inserta un registro en la tabla `public.locations` con la latitud y longitud 
+   capturadas del dispositivo, vinculándolas a la orden de servicio con la 
+   bandera `is_target = false`.
+
+Paso 5: Registro de Comentarios y Cierre
+1. El técnico redacta sus comentarios finales en el campo de texto "Observaciones" 
+   (por ejemplo: "Se realizó el cambio de fusible y se probó la corriente").
+2. Presiona "Agregar comentario", insertando la nota en `public.observations`.
+3. Finalmente, hace clic en el botón "Marcar como Completada".
+4. El sistema actualiza el estado de la orden a "Completada" en la base de datos.
+5. La orden desaparece de los servicios activos del técnico y pasa a su historial.
+6. El administrador puede visualizar inmediatamente todo el reporte en su panel.
+
+--------------------------------------------------------------------------------
+FLUJO D: COMPORTAMIENTO OFFLINE DE LA PWA
+--------------------------------------------------------------------------------
+Para resguardar el trabajo del técnico ante problemas de señal:
+1. El Service Worker de la PWA almacena en la caché local del navegador los recursos 
+   principales (pantallas, hojas de estilo CSS de Leaflet, scripts).
+2. Si el técnico pierde la conexión a internet en medio de la calle:
+   - Puede seguir navegando por la aplicación y abrir la página del detalle del
+     servicio que cargó previamente.
+   - El sistema avisa visualmente mediante mensajes amigables si una petición al
+     servidor de Supabase falla debido a la desconexión.
+   - Los permisos de cámara y captura de GPS (geolocalización HTML5) siguen 
+     funcionando de manera local en el teléfono del técnico, ya que son APIs nativas
+     del navegador que no requieren cobertura de datos.
+   - Una vez que el dispositivo recupera señal de red, el técnico realiza la 
+     subida de las evidencias acumuladas, asegurando la consistencia final de la
+     documentación.
+================================================================================

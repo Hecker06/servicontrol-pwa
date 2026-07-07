@@ -5,8 +5,9 @@ import { useAuth } from '../../context/AuthContext';
 import { Navbar } from '../../components/Navbar';
 import { 
   ChevronLeft, Play, CheckCircle, Camera, MapPin, 
-  User, Phone, FileText, AlertTriangle, Trash2 
+  User, Phone, FileText, AlertTriangle, Trash2, Package 
 } from 'lucide-react';
+import { inventoryDb, type InventoryItem, type OrderItem } from '../../lib/inventoryDb';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -50,6 +51,13 @@ export const TechOrderDetail: React.FC = () => {
 
   // Form inputs for Technician
   const [comment, setComment] = useState('');
+  
+  // Inventory state
+  const [materials, setMaterials] = useState<OrderItem[]>([]);
+  const [availableInventory, setAvailableInventory] = useState<InventoryItem[]>([]);
+  const [matSelectId, setMatSelectId] = useState('');
+  const [matQty, setMatQty] = useState(1);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
   
   // Geolocation state
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -147,6 +155,12 @@ export const TechOrderDetail: React.FC = () => {
         setComment(obsData[0].comment);
       }
 
+      // Fetch materials and available inventory
+      const itemsData = await inventoryDb.getOrderItems(id);
+      setMaterials(itemsData);
+      const invData = await inventoryDb.getInventoryItems();
+      setAvailableInventory(invData);
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Error al cargar los detalles de la orden');
@@ -158,6 +172,56 @@ export const TechOrderDetail: React.FC = () => {
   useEffect(() => {
     fetchOrderDetails();
   }, [id, user]);
+
+  const handleAddMaterial = async () => {
+    if (!order || !matSelectId || !id) return;
+    const item = availableInventory.find(i => i.id === matSelectId);
+    if (!item) return;
+
+    if (item.stock < matQty) {
+      alert(`Stock insuficiente. Solo hay ${item.stock} ${item.unit} disponibles.`);
+      return;
+    }
+
+    setLoadingMaterials(true);
+    try {
+      await inventoryDb.addOrderItem(id, matSelectId, matQty);
+      
+      // Refresh list
+      const itemsData = await inventoryDb.getOrderItems(id);
+      setMaterials(itemsData);
+      const invData = await inventoryDb.getInventoryItems();
+      setAvailableInventory(invData);
+      setMatSelectId('');
+      setMatQty(1);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error al agregar el material');
+    } finally {
+      setLoadingMaterials(false);
+    }
+  };
+
+  const handleRemoveMaterial = async (itemId: string) => {
+    if (!order || !id) return;
+    if (!window.confirm('¿Deseas eliminar este registro de material consumido?')) return;
+    
+    setLoadingMaterials(true);
+    try {
+      await inventoryDb.removeOrderItem(id, itemId);
+      
+      // Refresh list
+      const itemsData = await inventoryDb.getOrderItems(id);
+      setMaterials(itemsData);
+      const invData = await inventoryDb.getInventoryItems();
+      setAvailableInventory(invData);
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al quitar el material');
+    } finally {
+      setLoadingMaterials(false);
+    }
+  };
 
   const handleStartService = async () => {
     if (!order) return;
@@ -584,7 +648,87 @@ export const TechOrderDetail: React.FC = () => {
                   )}
                 </div>
 
-                {/* 2. Geolocation Info */}
+                {/* 2. Materials Consumption */}
+                <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 shadow-md space-y-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 font-sans">
+                    <Package className="w-4 h-4 text-indigo-400" />
+                    Materiales e Insumos Utilizados
+                  </h3>
+
+                  {/* List of registered materials for this order */}
+                  {materials.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic">No se han registrado materiales consumidos para este servicio.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {materials.map((mat) => (
+                        <div key={mat.id} className="bg-slate-950/45 border border-slate-800/80 px-3.5 py-3 rounded-xl flex items-center justify-between text-xs">
+                          <div>
+                            <p className="font-semibold text-slate-200">{mat.inventory_items?.name || 'Insumo'}</p>
+                            <p className="text-slate-500 text-[10px] mt-0.5">{mat.inventory_items?.unit || 'unidad'}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-indigo-400 text-sm">{mat.quantity}</span>
+                            {order.status === 'En progreso' && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMaterial(mat.item_id)}
+                                disabled={loadingMaterials}
+                                className="text-slate-550 hover:text-rose-450 p-1 rounded transition-colors disabled:opacity-30 cursor-pointer"
+                                title="Quitar material"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add material form (only if order is En progreso) */}
+                  {order.status === 'En progreso' && (
+                    <div className="border-t border-slate-800/80 pt-4 mt-2 space-y-3">
+                      <p className="text-xs text-slate-400 font-semibold">Registrar consumo de material:</p>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <select
+                            value={matSelectId}
+                            onChange={(e) => setMatSelectId(e.target.value)}
+                            disabled={loadingMaterials}
+                            className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-2 px-3 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
+                          >
+                            <option value="" className="bg-slate-900">-- Selecciona Material --</option>
+                            {availableInventory.map((item) => (
+                              <option key={item.id} value={item.id} className="bg-slate-900" disabled={item.stock <= 0}>
+                                {item.name} ({item.stock} en stock)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-16">
+                          <input
+                            type="number"
+                            min={1}
+                            value={matQty}
+                            onChange={(e) => setMatQty(Math.max(1, parseInt(e.target.value) || 1))}
+                            disabled={loadingMaterials || !matSelectId}
+                            className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-2 px-3 text-slate-250 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddMaterial}
+                          disabled={loadingMaterials || !matSelectId}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Registrar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Geolocation Info */}
                 <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 shadow-md space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-indigo-400 flex items-center justify-between">
                     <span>Geolocalización GPS</span>

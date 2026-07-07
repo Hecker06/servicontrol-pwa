@@ -40,9 +40,19 @@ export const TechDashboard: React.FC = () => {
 
       if (dbError) throw dbError;
       setOrders(data as Order[]);
+      // Guardar en la caché local para disponibilidad offline
+      localStorage.setItem(`cached_orders_${user.id}`, JSON.stringify(data));
+      setError(null);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Error al cargar tus órdenes de servicio');
+      // Recuperar de la caché local en caso de error de conexión
+      const cachedData = localStorage.getItem(`cached_orders_${user.id}`);
+      if (cachedData) {
+        setOrders(JSON.parse(cachedData) as Order[]);
+        setError('Operando en modo sin conexión. Se muestran las órdenes guardadas localmente.');
+      } else {
+        setError('No hay conexión a internet y no existen datos locales guardados previamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -136,7 +146,15 @@ export const TechDashboard: React.FC = () => {
           </button>
         </div>
 
-        {error && <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-450 rounded-xl mb-6 text-sm">{error}</div>}
+        {error && (
+          <div className={`p-4 border rounded-xl mb-6 text-sm ${
+            error.includes('sin conexión')
+              ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+              : 'bg-rose-500/10 border-rose-500/20 text-rose-450'
+          }`}>
+            {error}
+          </div>
+        )}
 
         {/* Order List */}
         {loading ? (

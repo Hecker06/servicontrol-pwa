@@ -1,0 +1,152 @@
+================================================================================
+SERVICONTROL PWA - DOCUMENTACIÓN TÉCNICA
+PARTE 1: ARQUITECTURA Y DISEÑO DEL SISTEMA
+================================================================================
+
+Este documento detalla la arquitectura de software, el stack tecnológico,
+las capacidades PWA (Progressive Web Application) y las decisiones de diseño
+de la aplicación "ServiControl PWA" (Control de Órdenes de Servicio),
+desarrollada como un sistema web responsive de alto rendimiento.
+
+--------------------------------------------------------------------------------
+1. ARQUITECTURA GENERAL (DESACOPLADA)
+--------------------------------------------------------------------------------
+ServiControl adopta una arquitectura moderna basada en la separación completa
+del Frontend y el Backend (frontend-backend decoupling), aprovechando servicios
+serverless en la nube:
+
+a) Capa de Cliente (Frontend PWA):
+   - Construido en React con TypeScript, optimizado con Vite como empaquetador.
+   - Funciona como Single Page Application (SPA).
+   - Incorpora capacidades PWA mediante Service Workers, permitiendo la 
+     instalación nativa en dispositivos móviles/escritorio y almacenamiento en
+     caché local para soportar operación sin conexión a internet (offline).
+   - Diseñado bajo el enfoque "Mobile First" ya que el principal operador de
+     campo (el técnico) accede desde dispositivos móviles.
+
+b) Capa de Servicios en la Nube (Backend Serverless - Supabase):
+   - Supabase actúa como Backend-as-a-Service (BaaS), proporcionando:
+     * Base de datos relacional (PostgreSQL).
+     * Autenticación y Autorización de usuarios (Supabase Auth).
+     * Almacenamiento de archivos/imágenes (Supabase Storage).
+     * Políticas de seguridad a nivel de fila (Row-Level Security - RLS).
+   - La comunicación entre el frontend y el backend se realiza mediante HTTPS
+     usando la API RESTful generada automáticamente por Supabase y el cliente
+     oficial de JavaScript `@supabase/supabase-js`.
+
+--------------------------------------------------------------------------------
+2. STACK TECNOLÓGICO Y HERRAMIENTAS
+--------------------------------------------------------------------------------
+El sistema está compuesto por las siguientes tecnologías principales:
+
+- Core Frontend: React 18+ (con TypeScript para tipado estático seguro).
+- Entorno de Desarrollo y Construcción: Vite (compilación ultra rápida y HMR).
+- Estilos y UI: Tailwind CSS v4 (procesamiento CSS instantáneo y moderno)
+  y vanilla CSS complementario para ajustes finos.
+- Mapas Interactivos: Leaflet CSS y JS (consumiendo mapas de OpenStreetMap)
+  para geolocalización y renderizado interactivo de ubicaciones de técnicos
+  sin requerir costosas licencias comerciales.
+- Rutas: React Router DOM v6 para enrutamiento SPA y protección de rutas.
+- Base de Datos y Backend: PostgreSQL gestionado en Supabase.
+- Almacenamiento: Supabase Storage (Bucket público para evidencias).
+- Despliegue y Alojamiento: Vercel (Hosting serverless con CD desde GitHub).
+
+--------------------------------------------------------------------------------
+3. ARQUITECTURA DE SOFTWARE DEL FRONTEND (ESTRUCTURA DE ARCHIVOS)
+--------------------------------------------------------------------------------
+El proyecto sigue una estructura limpia y modular dentro del directorio `/src`:
+
+/src
+│
+├── context/
+│   └── AuthContext.tsx        # Administra el estado global de autenticación,
+│                              # monitorea cambios de sesión de Supabase Auth
+│                              # y recupera el perfil del usuario (con su rol).
+│
+├── components/
+│   ├── ProtectedRoute.tsx     # Guarda y restringe el acceso a rutas específicas
+│                              # basándose en si el usuario está autenticado
+│                              # y si posee el rol requerido ('admin' o 'tecnico').
+│   └── Navbar.tsx             # Barra de navegación interactiva y responsiva con
+│                              # indicador visual de rol y control de cierre de sesión.
+│
+├── lib/
+│   └── supabase.ts            # Inicializa y exporta el cliente singleton de Supabase
+│                              # utilizando variables de entorno de Vite (.env).
+│
+├── pages/
+│   ├── Login.tsx              # Control de acceso con formulario de inicio de sesión
+│   │                          # y registro de nuevos usuarios en el sistema.
+│   │
+│   ├── admin/                 # Módulo de Administración (Panel de control)
+│   │   ├── Dashboard.tsx      # Dashboard con estadísticas de órdenes, filtros de
+│   │   │                      # búsqueda y mapa interactivo con Leaflet.
+│   │   ├── OrderForm.tsx      # Formulario para registrar y editar órdenes vinculando
+│   │   │                      # clientes, técnicos de campo y ubicaciones.
+│   │   └── Clients.tsx        # CRUD completo de la información de contacto de clientes.
+│   │
+│   └── tech/                  # Módulo del Técnico (Trabajo de campo)
+│       ├── Dashboard.tsx      # Lista optimizada de servicios asignados a dicho técnico,
+│       │                      # categorizada en activos y completados.
+│       └── OrderDetail.tsx    # Ficha operativa para iniciar la orden, capturar fotos,
+│                              # coordenadas de geolocalización y guardar observaciones.
+│
+├── App.tsx                    # Enrutador principal y distribuidor de rutas.
+├── main.tsx                   # Punto de entrada de la aplicación que renderiza el árbol.
+├── index.css                  # Hoja de estilo global y configuración de Tailwind CSS.
+└── App.css                    # Estilos adicionales específicos del layout base.
+
+--------------------------------------------------------------------------------
+4. CAPACIDADES PWA Y ESTRATEGIA OFFLINE
+--------------------------------------------------------------------------------
+Para garantizar que los técnicos puedan trabajar en zonas de baja conectividad o 
+sin señal celular, ServiControl implementa las siguientes capacidades PWA:
+
+1. Service Worker (Generado con `vite-plugin-pwa`):
+   - Se ejecuta en segundo plano en el navegador web del usuario.
+   - Intercepta las peticiones de red y cachea todos los recursos estáticos de
+     la aplicación (HTML, CSS, JS, imágenes, fuentes tipográficas).
+   - Permite que la app cargue de manera casi instantánea y que sea completamente 
+     funcional en su interfaz incluso sin conexión a internet.
+
+2. Manifiesto Web (manifest.webmanifest):
+   - Define el nombre de la app, colores de tema, modo de visualización 
+     (standalone, ocultando la barra del navegador) e íconos de resolución.
+   - Permite la "instalación" en el menú de aplicaciones del sistema en Windows,
+     Android, iOS y macOS (añadir al home screen), ofreciendo una experiencia
+     completamente nativa.
+
+3. Estrategia de Datos Offline:
+   - Los datos estáticos e interfaces críticas de formularios se mantienen 
+     precargados en caché gracias al service worker.
+   - En caso de pérdida de conexión durante el registro de evidencias, el técnico
+     recibe retroalimentación clara del sistema (Experience Degradation de forma
+     controlada) invitándole a completar las acciones cuando recupere la señal.
+
+--------------------------------------------------------------------------------
+5. DECISIONES DE DISEÑO Y ESTÉTICA (UI/UX)
+--------------------------------------------------------------------------------
+El sistema destaca por una interfaz moderna, limpia y premium que fomenta la 
+adopción del usuario final mediante las siguientes decisiones de diseño:
+
+- Paleta de Colores Moderna (Modo Oscuro Integrado):
+  Utiliza un tema predominantemente oscuro sobre tonos pizarra (`slate-900`/`slate-950`) 
+  combinado con acentos de color vibrantes (índigo y violeta en administrador,
+  esmeralda en técnicos) para diferenciar claramente las vistas y estatus del sistema.
+- Elementos Visuales Dinámicos:
+  Pantalla de login con un fondo de degradado dinámico en constante movimiento,
+  tarjetas de visualización de métricas con bordes sutiles y efectos de vidrio
+  (glassmorphism), y micro-animaciones en los botones e inputs al pasar el cursor.
+- Usabilidad Móvil:
+  Botones táctiles grandes, menús colapsables intuitivos y formularios secuenciales
+  para evitar sobrecargar la pantalla pequeña de los teléfonos móviles de los técnicos.
+- Indicadores de Estado Visuales:
+  Se emplean "Badges" de colores semáforo para identificar los estados de las órdenes:
+  * Pendiente / Asignada: Amarillo / Azul cielo.
+  * En progreso: Naranja de advertencia o transición.
+  * Completada: Verde esmeralda.
+  * Cancelada: Rojo.
+- Mapas Integrados:
+  El panel del administrador carga mapas oscuros personalizados de Leaflet con
+  marcadores de ubicación de evidencias e iconos informativos en tiempo real.
+================================================================================

@@ -94,3 +94,22 @@ npm run preview
 ```
 
 Visita la dirección que te provea el comando `npm run preview` desde Google Chrome o Microsoft Edge, y verás un icono de descarga (pantalla con flecha) en la barra de direcciones que te permitirá **Instalar ServiControl** como aplicación nativa en tu ordenador o dispositivo móvil.
+
+---
+
+## Módulo de Inventario (Nuevos Cambios Integrados)
+
+Hemos integrado un control básico de inventario al sistema, extendiendo la arquitectura existente.
+
+### 1. Base de Datos
+- **[schema.sql](file:///c:/Users/USUARIO/Desktop/Estadias%20Prod/schema.sql):** Añadidas las tablas `public.inventory_items` y `public.order_items` con Row Level Security (RLS) habilitado. Se crearon políticas específicas para que los técnicos puedan reportar consumos y leer stock, y los administradores mantengan el control total.
+
+### 2. Capa de Datos Híbrida
+- **[src/lib/inventoryDb.ts](file:///c:/Users/USUARIO/Desktop/Estadias%20Prod/src/lib/inventoryDb.ts):** Implementación de una capa inteligente que conecta con Supabase, pero si detecta que las tablas de inventario no existen aún en la instancia de Supabase de producción, realiza un fallback transparente a `localStorage` precargando insumos iniciales para pruebas (cables, conectores, canaletas, etc.).
+
+### 3. Vistas y Componentes
+- **[src/pages/admin/Inventory.tsx](file:///c:/Users/USUARIO/Desktop/Estadias%20Prod/src/pages/admin/Inventory.tsx):** Panel premium de administración de stock con KPIs interactivos (insumos totales, productos agotados, alertas de bajo stock), buscador y operaciones CRUD para agregar, editar, eliminar y modificar stock rápidamente (`+`/`-`).
+- **[src/pages/admin/OrderForm.tsx](file:///c:/Users/USUARIO/Desktop/Estadias%20Prod/src/pages/admin/OrderForm.tsx):** Sección "Insumos / Materiales Estimados" al crear/editar una orden, permitiendo planificar insumos antes del trabajo.
+- **[src/pages/admin/Dashboard.tsx](file:///c:/Users/USUARIO/Desktop/Estadias%20Prod/src/pages/admin/Dashboard.tsx):** Visualización detallada de materiales asignados a cada servicio en el modal del administrador.
+- **[src/pages/tech/OrderDetail.tsx](file:///c:/Users/USUARIO/Desktop/Estadias%20Prod/src/pages/tech/OrderDetail.tsx):** Registro interactivo para el técnico, quien puede descontar materiales directamente del inventario según los insumos que consuma en campo.
+

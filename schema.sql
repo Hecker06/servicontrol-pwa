@@ -338,3 +338,115 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+
+-----------------
+-- 7. TABLAS DE INVENTARIO Y CONSUMO DE MATERIALES
+-----------------
+
+-- Tabla de Ítems de Inventario (Insumos, materiales, repuestos)
+create table if not exists public.inventory_items (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  description text,
+  stock integer not null default 0,
+  unit text not null default 'unidad',
+  created_at timestamptz default now()
+);
+
+-- Habilitar RLS para la tabla de inventario
+alter table public.inventory_items enable row level security;
+
+-- Políticas de RLS para public.inventory_items
+create policy "Cualquier usuario autenticado puede ver el inventario"
+  on public.inventory_items for select
+  to authenticated
+  using (true);
+
+create policy "Solo los administradores pueden gestionar el inventario"
+  on public.inventory_items for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+-- Tabla de Insumos/Materiales consumidos en las Órdenes de Servicio
+create table if not exists public.order_items (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid references public.service_orders(id) on delete cascade not null,
+  item_id uuid references public.inventory_items(id) on delete cascade not null,
+  quantity integer not null default 1,
+  created_at timestamptz default now(),
+  unique(order_id, item_id)
+);
+
+-- Habilitar RLS para la tabla de consumo
+alter table public.order_items enable row level security;
+
+-- Políticas de RLS para public.order_items
+create policy "Cualquier usuario autenticado puede ver materiales de órdenes"
+  on public.order_items for select
+  to authenticated
+  using (true);
+
+create policy "Administradores pueden gestionar todos los materiales de órdenes"
+  on public.order_items for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Técnicos pueden registrar consumos en sus órdenes asignadas"
+  on public.order_items for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.service_orders s
+      where s.id = order_items.order_id and s.technician_id = auth.uid()
+    )
+  );
+
+create policy "Técnicos pueden actualizar consumos en sus órdenes asignadas"
+  on public.order_items for update
+  to authenticated
+  using (
+    exists (
+      select 1 from public.service_orders s
+      where s.id = order_items.order_id and s.technician_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.service_orders s
+      where s.id = order_items.order_id and s.technician_id = auth.uid()
+    )
+  );
+
+create policy "Técnicos pueden eliminar consumos en sus órdenes asignadas"
+  on public.order_items for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.service_orders s
+      where s.id = order_items.order_id and s.technician_id = auth.uid()
+    )
+  );
+

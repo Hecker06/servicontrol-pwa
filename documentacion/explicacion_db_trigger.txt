@@ -1,0 +1,36 @@
+================================================================================
+EXPLICACIÓN TÉCNICA: TRIGGER Y FUNCIÓN DE SINCRONIZACIÓN DE USUARIOS
+================================================================================
+
+Este bloque de código, implementado a nivel de base de datos en PostgreSQL
+(alojado en Supabase), resuelve la sincronización automática entre la tabla
+interna de autenticación de Supabase (`auth.users`) y la tabla de uso público
+`public.profiles` del esquema de la aplicación.
+
+FUNCIONAMIENTO PASO A PASO:
+1. **Creación de la Función Procedural (`handle_new_user()`)**:
+   - Escrita en lenguaje procedural PL/pgSQL.
+   - Declarada con la cláusula `security definer`, lo que significa que se ejecuta
+     con los privilegios del usuario creador (postgres), sobrepasando políticas RLS
+     temporales al insertar perfiles iniciales.
+   - Toma los datos del registro entrante en `auth.users` (representado por la
+     variable especial `new` de PostgreSQL).
+   - Inserta una fila en `public.profiles` mapeando `id` (referencia externa PK/FK),
+     `email` y recupera el nombre de usuario (`name`) y el rol operativo (`role`)
+     desde el campo estructurado de metadatos JSON `raw_user_meta_data`.
+   - Utiliza la función `coalesce()` para asignar por defecto el rol de 'tecnico'
+     si no se especifica explícitamente en el registro inicial del frontend.
+
+2. **Definición del Disparador o Trigger (`on_auth_user_created`)**:
+   - Configurado para dispararse automáticamente después de una inserción (`after insert`)
+     en la tabla `auth.users`.
+   - La opción `for each row` garantiza que se ejecute una vez por cada registro de
+     usuario nuevo.
+   - Invoca directamente el procedimiento `handle_new_user()`.
+
+BENEFICIO OPERATIVO:
+Evita el acoplamiento directo y la necesidad de programar llamadas secundarias de
+inserción de perfiles desde el cliente frontend tras el registro, garantizando que
+cada cuenta creada en el sistema tenga siempre y de forma consistente su perfil
+asociado con el rol de acceso correspondiente de manera inmediata.
+================================================================================

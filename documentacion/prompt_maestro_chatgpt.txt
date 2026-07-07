@@ -1,0 +1,90 @@
+================================================================================
+PROMPT MAESTRO PARA CHATGPT: DOCUMENTACIÓN TÉCNICA DE IMPLEMENTACIÓN (3.2)
+================================================================================
+
+Este archivo contiene el prompt maestro definitivo diseñado para indicarle a
+ChatGPT exactamente cómo estructurar, redactar y documentar la sección 3.2 de tu
+reporte de estadías de ServiControl PWA, adoptando la postura de un ingeniero 
+implementador y siguiendo la metodología formal de la UTTN.
+
+--------------------------------------------------------------------------------
+INSTRUCCIONES PARA EL ALUMNO:
+1. Copia el bloque completo bajo la línea "[INICIO DEL PROMPT]" y pégalo en ChatGPT.
+2. Adjunta a la conversación de ChatGPT el archivo "manual_tecnico_maestro.txt"
+   (que contiene los detalles del código, SQL y la arquitectura real de ServiControl).
+--------------------------------------------------------------------------------
+
+---
+[INICIO DEL PROMPT]
+Actúa como un director de tesis de Ingeniería en Desarrollo de Software y redactor técnico experto. Tu tarea consiste en redactar de forma exhaustiva y rigurosa la sección "3.2 Implementación de la mejora del sistema" del reporte final de estadías para el sistema de control de órdenes de servicio "ServiControl PWA".
+
+Para cumplir con el estándar técnico y metodológico esperado por el comité de evaluación, debes procesar los datos de la arquitectura de la aplicación descritos en el archivo adjunto "manual_tecnico_maestro.txt". Tu enfoque al redactar no debe ser el de un "arquitecto de software que describe de forma general qué existe", sino el de un **ingeniero implementador que documenta de forma detallada cómo se construyó y por qué se tomaron las decisiones de diseño**.
+
+--------------------------------------------------------------------------------
+1. DIRECTRICES METODOLÓGICAS DE REDACCIÓN (UTTN - DE APEGO OBLIGATORIO)
+--------------------------------------------------------------------------------
+- **Voz Pasiva e Impersonal**: La redacción debe ser 100% impersonal (ej. "Se diseña el esquema", "Se ejecuta la consulta", "Se gestiona el estado"). Queda estrictamente prohibido redactar en primera persona (NO uses: "desarrollamos", "creé", "programamos").
+- **Tiempo Presente**: Todo el documento debe redactarse en tiempo presente (ej. "La aplicación conecta con Supabase", "El Service Worker almacena en caché", "Se restringe el acceso"). No uses el futuro (NO uses: "se creará", "funcionará", "se implementará").
+- **Formato de Títulos**: Solo la primera letra del título o subtítulo va en mayúscula, el resto en minúscula (ej. "Diseño detallado de la base de datos" en lugar de "DISEÑO DETALLADO DE LA BASE DE DATOS" o "Diseño Detallado de la Base de Datos").
+- **Regla de Acrónimos**: Al mencionar una sigla por primera vez, escribe primero el significado completo y luego el acrónimo entre paréntesis (ej. "Row Level Security (RLS)", "Single Page Application (SPA)", "Progressive Web Application (PWA)", "Data Definition Language (DDL)").
+- **Estilo de Texto**: Texto 100% justificado. Sin sangría al inicio de los párrafos. No utilices palabras en cursiva o negrita dentro del cuerpo de texto a menos que sean nombres de variables o archivos específicos.
+
+--------------------------------------------------------------------------------
+2. ESTRUCTURA INTERNA PARA CADA APARTADO (APARTADOS DEL 3.2.1 AL 3.2.7)
+--------------------------------------------------------------------------------
+Para cada subsección de la implementación, debes desarrollar de forma hilada y robusta los siguientes 9 puntos en su prosa, evitando que se lea como un tutorial (no utilices frases como "haz clic", "presiona el botón", "dirígete a"):
+
+1. **Objetivo Técnico**: Qué problema de ingeniería resuelve este módulo o componente específico.
+2. **Tecnología y Justificación**: Qué herramientas se emplearon (ej. PostgreSQL, Leaflet, vite-plugin-pwa) y la justificación técnica de la decisión en base a los Requerimientos No Funcionales (RNF).
+3. **Inicio de la Implementación**: Cómo arranca o inicializa este componente dentro del ciclo de vida del sistema (ej. scripts de arranque, inicialización de clientes, middlewares).
+4. **Componentes Relacionados**: Qué archivos, tablas, variables o hooks interactúan directamente en este apartado.
+5. **Comunicación Interna**: Cómo interactúan los elementos del frontend y backend en esta sección (ej. llamadas asíncronas, eventos, promesas, tipos de datos).
+6. **Flujo Interno Completo**: La secuencia lógica detallada del procesamiento de datos en este módulo (el ciclo de vida del dato).
+7. **Interacción con el Siguiente Módulo**: Cómo este módulo le entrega el flujo de control o la información a la siguiente sección del sistema.
+8. **Fragmentos de Código**: Incluye los bloques de código clave (SQL, TypeScript/React) provistos en el manual maestro como sustento de la explicación.
+9. **Referencia a Figura**: Inserta y menciona la referencia a la figura explicativa correspondiente (ej. "como se ilustra en la Figura X").
+
+--------------------------------------------------------------------------------
+3. DETALLES ESPECÍFICOS QUE DEBES DOCUMENTAR POR APARTADO
+--------------------------------------------------------------------------------
+
+**3.2 Implementación de la mejora del sistema**
+- Escribe una introducción técnica sobre cómo la PWA y la arquitectura serverless sustituyen las ineficiencias de los reportes en papel.
+- Presenta las dos tablas: Tabla 1 (Requerimientos Funcionales) y Tabla 2 (Requerimientos No Funcionales) completas y estructuradas formalmente.
+
+**3.2.1 Diseño detallado de la base de datos en Supabase (PostgreSQL)**
+- *Justificación*: Por qué se seleccionó PostgreSQL (sistema relacional con soporte nativo de tipos complejos, integridad referencial y RLS) y por qué Supabase como base de datos administrada.
+- *Estructura*: Detalla el diccionario de datos de las 6 tablas, explicando por qué existen sus campos, llaves primarias, llaves foráneas y sus restricciones (ej. restricciones de chequeo de roles y estados, cascadas de borrado).
+- *Inicialización e Integridad*: Inserta y explica el código SQL DDL completo de creación de tablas. Explica cómo viaja un dato desde la UI hasta almacenarse físicamente en PostgreSQL.
+- *Automatización*: Inserta el código de la función PL/pgSQL y trigger `handle_new_user()` y detalla cómo actúa en el registro de usuarios de Supabase Auth con la tabla pública `profiles`, incluyendo el rol por defecto.
+- *Seguridad (RLS)*: Inserta las sentencias de políticas de RLS. Explica paso a paso cómo Supabase Auth provee el JWT y cómo el motor de Postgres evalúa `auth.uid()` para denegar o permitir accesos a técnicos y administradores de forma interna.
+
+**3.2.2 Arquitectura y estructura del proyecto**
+- Describe la estructura modular del frontend en React + TypeScript y Vite.
+- Explica el árbol de carpetas y justifica la separación en `context`, `components`, `lib` y `pages`.
+- *TSConfig*: Explica técnicamente por qué se configura `"verbatimModuleSyntax": true` en el compilador de TypeScript y cómo obliga al uso de `import type` para evitar la inclusión de metadatos de tipos en el empaquetado del navegador, optimizando el rendimiento.
+
+**3.2.3 Autenticación de usuarios y control de acceso**
+- Describe la implementación de la sesión y el hook `onAuthStateChange` de Supabase en `AuthContext.tsx`.
+- Explica técnicamente cómo el componente `ProtectedRoute.tsx` actúa como un guardia de rutas asíncrono, protegiendo las páginas del administrador y del técnico e impidiendo la navegación no autorizada mediante comparaciones condicionales de roles.
+
+**3.2.4 Desarrollo de la interfaz de administración**
+- Explica la lógica detrás de la creación y edición de clientes y órdenes de servicio.
+- *Formulario e Integración Cartográfica*: Explica la lógica en `OrderForm.tsx`. Describe la integración de la biblioteca **Leaflet** y cómo se implementa el controlador de eventos de mapa (`MapClickHandler`) que realiza llamadas HTTPS asíncronas a la API Nominatim de OpenStreetMap para traducir una coordenada (latitud, longitud) en una dirección física y legible.
+
+**3.2.5 Dashboard administrativo e historial de servicios**
+- Describe el funcionamiento de los KPIs interactivos en `Dashboard.tsx`.
+- *Auditoría*: Explica de manera detallada el modal de inspección de órdenes. Detalla cómo se cargan las evidencias fotográficas de la orden y cómo el mapa interactivo posiciona dos marcadores (el marcador objetivo configurado por el administrador y el marcador GPS real desde el cual el técnico envió el reporte) para auditar el cumplimiento del servicio.
+
+**3.2.6 Panel del técnico en campo y cierre de órdenes**
+- Describe la interfaz móvil responsiva y el filtrado por RLS para mostrar solo órdenes asignadas al técnico.
+- *Lógica de cierre*: Explica cómo el navegador móvil interactúa con el hardware a través de la API Geolocation de HTML5 (GPS) y la cámara nativa del dispositivo (`capture="environment"`). Explica detalladamente la lógica de validación condicional que bloquea el cambio de estado a "Completada" si no se detectan registros en `evidences` y `observations` vinculados a la orden.
+
+**3.2.7 Mecanismos de disponibilidad PWA e instalación**
+- Explica la integración de `vite-plugin-pwa` para compilar el Service Worker.
+- Describe la estrategia de almacenamiento en caché para los recursos estáticos.
+- Detalla los parámetros configurados en el manifiesto web (como el modo `standalone` e iconos maskable) que permiten registrar e instalar ServiControl en el sistema operativo local.
+
+*Redacta el contenido de forma corrida, profunda, altamente técnica y metódica, asegurando que cada sección parezca una memoria técnica de ingeniería de software.*
+[FIN DEL PROMPT]
+---

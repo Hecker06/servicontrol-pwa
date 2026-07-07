@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Shield, Wrench, User } from 'lucide-react';
 
@@ -10,18 +11,43 @@ export const Navbar: React.FC = () => {
   return (
     <nav className="bg-slate-900 border-b border-slate-800 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Brand */}
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/10">
-            {profile.role === 'admin' ? (
-              <Shield className="w-5 h-5 text-white" />
-            ) : (
-              <Wrench className="w-5 h-5 text-white" />
-            )}
-          </div>
-          <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-            ServiControl
-          </span>
+        {/* Brand & Nav */}
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/10">
+              {profile.role === 'admin' ? (
+                <Shield className="w-5 h-5 text-white" />
+              ) : (
+                <Wrench className="w-5 h-5 text-white" />
+              )}
+            </div>
+            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              ServiControl
+            </span>
+          </Link>
+
+          {profile.role === 'admin' && (
+            <div className="hidden sm:flex items-center gap-1.5 ml-2 border-l border-slate-800 pl-4">
+              <Link
+                to="/admin"
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-850 transition-colors"
+              >
+                Órdenes
+              </Link>
+              <Link
+                to="/admin/clients"
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-850 transition-colors"
+              >
+                Clientes
+              </Link>
+              <Link
+                to="/admin/inventory"
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-slate-100 hover:bg-slate-850 transition-colors"
+              >
+                Inventario
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* User Info & Action */}

@@ -1,0 +1,177 @@
+================================================================================
+SERVICONTROL PWA - DOCUMENTACIÓN TÉCNICA
+PARTE 2: MODELO DE DATOS Y SEGURIDAD RLS
+================================================================================
+
+Este documento detalla la estructura física de la base de datos (PostgreSQL
+alojada en Supabase) y la implementación de políticas de seguridad a nivel de
+fila (Row-Level Security - RLS) para garantizar el aislamiento de datos y la 
+autorización de roles en el sistema ServiControl.
+
+--------------------------------------------------------------------------------
+1. ESQUEMA DE BASE DE DATOS (DICCIONARIO DE DATOS)
+--------------------------------------------------------------------------------
+La base de datos cuenta con 6 tablas principales interconectadas de forma
+relacional:
+
+a) Tabla `public.profiles`
+   Sincroniza la información extendida de los usuarios autenticados.
+   - `id` (UUID): Clave primaria (PK). Hace referencia a `auth.users(id)` con
+     eliminación en cascada.
+   - `email` (TEXT): Correo electrónico del usuario (obligatorio).
+   - `name` (TEXT): Nombre completo del usuario.
+   - `role` (TEXT): Rol del usuario en el sistema. Valores permitidos:
+     'admin' o 'tecnico'. Por defecto toma el valor 'tecnico'.
+   - `created_at` (TIMESTAMPTZ): Fecha y hora de creación de la cuenta.
+
+b) Tabla `public.clients`
+   Almacena los datos de los clientes que solicitan órdenes de servicio.
+   - `id` (UUID): Clave primaria (PK). Generado aleatoriamente de forma automática.
+   - `name` (TEXT): Nombre de la empresa o cliente individual (obligatorio).
+   - `phone` (TEXT): Número de contacto telefónico del cliente.
+   - `created_at` (TIMESTAMPTZ): Fecha y hora de registro del cliente.
+
+c) Tabla `public.service_orders`
+   Registra las órdenes de servicio, su estado y asignaciones.
+   - `id` (UUID): Clave primaria (PK). Generado aleatoriamente de forma automática.
+   - `client_id` (UUID): Clave foránea (FK) que referencia a `public.clients(id)`.
+     Eliminación en cascada.
+   - `technician_id` (UUID): Clave foránea (FK) que referencia a
+     `public.profiles(id)`. Si el perfil es eliminado, se setea como NULL.
+   - `status` (TEXT): Estado actual de la orden. Valores permitidos:
+     'Pendiente', 'Asignada', 'En progreso', 'Completada', 'Cancelada'.
+     Por defecto 'Pendiente'.
+   - `scheduled_at` (TIMESTAMPTZ): Fecha y hora programada para el servicio.
+   - `description` (TEXT): Detalle o motivo de la orden de servicio.
+   - `created_at` (TIMESTAMPTZ): Fecha y hora de creación del registro.
+
+d) Tabla `public.evidences`
+   Almacena las URLs de las fotografías tomadas por los técnicos o cargadas
+   por administradores.
+   - `id` (UUID): Clave primaria (PK). Generado automáticamente.
+   - `order_id` (UUID): Clave foránea (FK) que referencia a
+     `public.service_orders(id)`. Eliminación en cascada.
+   - `url` (TEXT): Enlace o ruta del archivo almacenado en Supabase Storage.
+   - `is_reference` (BOOLEAN): Determina si la foto fue subida por el admin
+     como referencia inicial (true) o si es evidencia del técnico (false).
+   - `created_at` (TIMESTAMPTZ): Fecha y hora de subida de la evidencia.
+
+e) Tabla `public.locations`
+   Registra las coordenadas GPS asociadas a la orden.
+   - `id` (UUID): Clave primaria (PK). Generado automáticamente.
+   - `order_id` (UUID): Clave foránea (FK) que referencia a
+     `public.service_orders(id)`. Eliminación en cascada.
+   - `latitude` (NUMERIC): Latitud GPS capturada en el dispositivo.
+   - `longitude` (NUMERIC): Longitud GPS capturada en el dispositivo.
+   - `address` (TEXT): Dirección legible por humanos aproximada (opcional).
+   - `is_target` (BOOLEAN): Indica si es la ubicación destino configurada por
+     el admin (true) o la ubicación capturada por el técnico en sitio (false).
+   - `recorded_at` (TIMESTAMPTZ): Fecha y hora del registro de geolocalización.
+
+f) Tabla `public.observations`
+   Comentarios y notas asociadas a las órdenes de servicio.
+   - `id` (UUID): Clave primaria (PK). Generado automáticamente.
+   - `order_id` (UUID): Clave foránea (FK) que referencia a
+     `public.service_orders(id)`. Eliminación en cascada.
+   - `comment` (TEXT): Contenido de la nota u observación.
+   - `created_at` (TIMESTAMPTZ): Fecha de registro de la observación.
+
+--------------------------------------------------------------------------------
+2. POLÍTICAS DE SEGURIDAD A NIVEL DE FILA (RLS)
+--------------------------------------------------------------------------------
+Para proteger la integridad de los datos en un ambiente universitario o 
+corporativo multitenant, RLS está habilitado en todas las tablas (`alter table
+<table> enable row level security;`). Esto impide que un usuario malicioso realice
+consultas directas a la API de Supabase para obtener registros ajenos.
+
+Políticas implementadas paso a paso:
+
+1. Tabla `profiles` (Perfiles)
+   - Lectura: Cualquier usuario autenticado puede leer perfiles (`using (true)`).
+     Esto es necesario para que el frontend pueda cargar listados de técnicos.
+   - Actualización: Un usuario solo puede modificar su propio registro de perfil.
+     `using (auth.uid() = id) with check (auth.uid() = id)`
+   - Inserción y Borrado: Restringido únicamente a usuarios con rol 'admin'.
+     Se valida mediante una subconsulta que comprueba el rol de la sesión activa:
+     `exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')`
+
+2. Tabla `clients` (Clientes)
+   - Lectura: Cualquier usuario autenticado puede consultar el listado de clientes.
+   - Modificación/CRUD completo: Reservado exclusivamente para administradores.
+     `using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))`
+
+3. Tabla `service_orders` (Órdenes de Servicio)
+   - Administradores: Permiso total (Lectura, Creación, Actualización y Borrado) sobre
+     todas las órdenes en el sistema.
+   - Técnicos (Aislamiento de Órdenes):
+     * Lectura: Un técnico solo puede visualizar las órdenes asignadas a su ID.
+       `using (technician_id = auth.uid())`
+     * Actualización: Un técnico solo puede actualizar el estado de las órdenes que
+       tenga asignadas. No puede reasignar la orden a otro técnico.
+       `using (technician_id = auth.uid()) with check (technician_id = auth.uid())`
+
+4. Tabla `evidences` (Evidencias Fotográficas)
+   - Administradores: Control total sobre todos los registros de evidencias.
+   - Técnicos:
+     * Lectura: Pueden ver evidencias pertenecientes a sus órdenes asignadas.
+       `using (exists (select 1 from public.service_orders s where s.id = evidences.order_id and s.technician_id = auth.uid()))`
+     * Inserción: Pueden subir evidencias únicamente para sus órdenes asignadas.
+       `with check (exists (select 1 from public.service_orders s where s.id = evidences.order_id and s.technician_id = auth.uid()))`
+     * Borrado: Pueden eliminar evidencias propias (no de referencia) sobre sus
+       órdenes asignadas.
+       `using (exists (select 1 from public.service_orders s where s.id = evidences.order_id and s.technician_id = auth.uid()) and is_reference = false)`
+
+5. Tabla `locations` (Ubicaciones GPS)
+   - Administradores: Control total sobre los registros de geolocalización.
+   - Técnicos:
+     * Lectura: Pueden visualizar ubicaciones de sus órdenes asignadas.
+       `using (exists (select 1 from public.service_orders s where s.id = locations.order_id and s.technician_id = auth.uid()))`
+     * Inserción: Pueden registrar coordenadas GPS de sus órdenes asignadas.
+       `with check (exists (select 1 from public.service_orders s where s.id = locations.order_id and s.technician_id = auth.uid()))`
+     * Actualización: Pueden actualizar sus propias coordenadas GPS de campo (no las objetivo de referencia fijadas por el admin).
+       `using (exists (select 1 from public.service_orders s where s.id = locations.order_id and s.technician_id = auth.uid()) and is_target = false)`
+
+6. Tabla `observations` (Comentarios)
+   - Administradores: Control total.
+   - Técnicos:
+     * Lectura: Pueden ver comentarios asociados a sus órdenes asignadas.
+     * Inserción: Pueden agregar nuevos comentarios a sus órdenes asignadas.
+
+--------------------------------------------------------------------------------
+3. SEGURIDAD EN EL ALMACENAMIENTO DE ARCHIVOS (STORAGE)
+--------------------------------------------------------------------------------
+El bucket de Supabase Storage titulado `evidences` está protegido mediante
+políticas RLS aplicadas sobre la tabla del sistema `storage.objects`:
+
+- Lectura Pública/Autenticada: Cualquier usuario autenticado puede visualizar y
+  descargar las fotos de evidencias si pertenecen al bucket 'evidences'.
+  `using (bucket_id = 'evidences')`
+- Carga de Imágenes: Los usuarios autenticados pueden cargar archivos nuevos en el
+  bucket.
+  `with check (bucket_id = 'evidences')`
+- Borrado de Imágenes: Los usuarios autenticados pueden eliminar archivos en el bucket.
+  `using (bucket_id = 'evidences')`
+
+--------------------------------------------------------------------------------
+4. AUTOMATIZACIÓN DE USUARIOS (TRIGGERS EN POSTGRESQL)
+--------------------------------------------------------------------------------
+Para evitar desajustes entre la tabla nativa de autenticación (`auth.users`) y
+la tabla pública de perfiles (`public.profiles`), se ha implementado un 
+disparador automático en la base de datos:
+
+1. Función Sincronizadora (`public.handle_new_user()`):
+   - Escrita en lenguaje procedural PL/pgSQL.
+   - Se ejecuta automáticamente cada vez que se inserta un registro en la tabla
+     `auth.users` (por ejemplo, cuando un usuario se registra en la pantalla de Login).
+   - Inserta de forma segura una fila en `public.profiles` mapeando:
+     * `id` del usuario.
+     * `email`.
+     * `name` extraído del JSON de metadatos proporcionado en el registro.
+     * `role` extraído de los metadatos (si no se proporciona, por defecto 'tecnico').
+
+2. Trigger (`on_auth_user_created`):
+   - Configurado para ejecutarse "AFTER INSERT ON auth.users FOR EACH ROW".
+   - Invoca de forma segura a `public.handle_new_user()`.
+   - Posee la firma `security definer` para ejecutar la inserción con privilegios
+     de sistema, sobrepasando las restricciones iniciales de la base de datos.
+================================================================================

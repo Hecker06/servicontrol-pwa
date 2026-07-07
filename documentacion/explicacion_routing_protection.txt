@@ -1,0 +1,38 @@
+================================================================================
+EXPLICACIÓN TÉCNICA: MIDDLEWARE DE ENRUTAMIENTO Y CONTROL DE ROLES (PROTECTEDROUTE)
+================================================================================
+
+Este componente funcional de React, escrito en TypeScript (`ProtectedRoute.tsx`),
+funciona como una compuerta o middleware del lado del cliente para restringir el
+acceso a rutas y vistas protegidas según el estado de la sesión y el rol del usuario.
+
+FUNCIONAMIENTO PASO A PASO:
+1. **Consumo de Estados Globales (`useAuth`)**:
+   - Invoca el hook personalizado `useAuth()`, que extrae del contexto global
+     (`AuthContext.tsx`) tres variables esenciales:
+     * `user`: El objeto de sesión de Supabase Auth (indica si está autenticado).
+     * `profile`: El perfil extendido del usuario (contiene el rol 'admin' o 'tecnico').
+     * `loading`: Booleano que indica si el sistema aún está recuperando la sesión.
+
+2. **Evaluación de Estados de Acceso**:
+   - **Caso de Carga (`loading`)**: Si el perfil aún está siendo consultado a la
+     base de datos remota, el componente bloquea el renderizado y retorna un indicador
+     visual de carga (`LoadingSpinner`), evitando parpadeos de interfaz o redirecciones.
+   - **Caso no Autenticado (`!user`)**: Si no existe una sesión activa registrada en
+     Supabase, el componente utiliza el redireccionador `<Navigate>` de React Router
+     para mover al usuario inmediatamente a la pantalla de `/login` reemplazando el
+     historial del navegador.
+   - **Caso de Rol no Autorizado (`allowedRoles`)**: Si la ruta tiene un arreglo de
+     roles permitidos especificado (ej. `allowedRoles={['admin']}`) y el rol cargado
+     en el perfil del usuario no coincide, redirige al usuario de vuelta a la ruta
+     raíz (`/`) de forma transparente.
+
+3. **Renderizado de Contenido Autorizado**:
+   - Si todas las validaciones son exitosas, el componente retorna sus elementos
+     hijos (`children`), pintando en pantalla la vista correspondiente.
+
+BENEFICIO OPERATIVO:
+Garantiza que la interfaz del técnico de campo esté completamente aislada del panel
+del administrador, bloqueando intentos de navegación forzada por parte de usuarios
+mediante la edición manual de la barra de direcciones en el navegador.
+================================================================================

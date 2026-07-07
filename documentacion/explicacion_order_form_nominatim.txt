@@ -1,0 +1,38 @@
+================================================================================
+EXPLICACIÓN TÉCNICA: GEOCODIFICACIÓN INVERSA CON LA API NOMINATIM
+================================================================================
+
+Este bloque de código, integrado dentro del formulario de registro y edición de
+órdenes (`OrderForm.tsx`), resuelve la conversión de coordenadas cartográficas en
+direcciones postales legibles de forma automática cuando el administrador programa
+un servicio sobre el mapa interactivo de Leaflet.
+
+FUNCIONAMIENTO PASO A PASO:
+1. **Llamada Asíncrona (`resolveAddress`)**:
+   - Declara la función `resolveAddress` utilizando la sintaxis `async/await` para
+     evitar el bloqueo del hilo de ejecución de la interfaz de usuario mientras
+     espera la respuesta de red.
+   - Recibe como parámetros numéricos la latitud (`lat`) y longitud (`lng`) del
+     punto donde el administrador hizo clic en el componente de mapa.
+
+2. **Consulta a OpenStreetMap Nominatim**:
+   - Lanza una petición HTTP de tipo GET utilizando la API estándar del navegador
+     `fetch()`.
+   - El endpoint consumido es `https://nominatim.openstreetmap.org/reverse`, pasando
+     en los query parameters el formato de respuesta (`jsonv2`) y las coordenadas.
+   - Esta API es libre y gratuita, eliminando la dependencia y costos asociados de
+     licenciamiento de APIs privativas (como la de Google Maps).
+
+3. **Lectura y Asignación de Datos**:
+   - Al recibir la respuesta del servidor, la descompone en un objeto JSON.
+   - Valida que la respuesta contenga el campo estructurado de dirección completa
+     `display_name`.
+   - Modifica el estado del componente mediante `setAddress(data.display_name)`, lo
+     cual actualiza instantáneamente el valor del input textual del formulario.
+
+BENEFICIO OPERATIVO:
+Acelera el proceso de programación de servicios, ya que el administrador solo debe
+hacer clic en el punto del mapa de la universidad o corporativo para que el sistema
+rellene la dirección postal de destino por sí solo, facilitando la orientación del
+técnico que acudirá a realizar el trabajo.
+================================================================================

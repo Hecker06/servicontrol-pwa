@@ -4,8 +4,9 @@ import { supabase } from '../../lib/supabase';
 import { Navbar } from '../../components/Navbar';
 import { 
   ChevronLeft, Save, Calendar, User, FileText, 
-  ClipboardList, MapPin, Camera, Trash2, Upload, X 
+  ClipboardList, MapPin, Camera, Trash2, Upload, X, Package
 } from 'lucide-react';
+import { inventoryDb, type InventoryItem } from '../../lib/inventoryDb';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -54,9 +55,15 @@ export const OrderForm: React.FC = () => {
   const [targetLng, setTargetLng] = useState<number | null>(null);
   const [targetAddress, setTargetAddress] = useState<string | null>(null);
   
-  // Reference Images State
   const [tempImages, setTempImages] = useState<{ file: File; preview: string }[]>([]);
   const [existingImages, setExistingImages] = useState<ExistingRefImage[]>([]);
+  
+  // Inventory State
+  const [inventoryList, setInventoryList] = useState<InventoryItem[]>([]);
+  const [initialMaterials, setInitialMaterials] = useState<{ itemId: string; quantity: number }[]>([]);
+  const [selectedMaterials, setSelectedMaterials] = useState<{ itemId: string; quantity: number }[]>([]);
+  const [materialSelectId, setMaterialSelectId] = useState('');
+  const [materialQty, setMaterialQty] = useState<number>(1);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -170,8 +177,21 @@ export const OrderForm: React.FC = () => {
               .eq('order_id', id)
               .eq('is_reference', true);
             setExistingImages(imagesData || []);
+
+            // Fetch order items (materials)
+            const orderItemsData = await inventoryDb.getOrderItems(id);
+            const mapped = orderItemsData.map(oi => ({
+              itemId: oi.item_id,
+              quantity: oi.quantity
+            }));
+            setSelectedMaterials(mapped);
+            setInitialMaterials(JSON.parse(JSON.stringify(mapped)));
           }
         }
+
+        // Fetch available inventory items
+        const invData = await inventoryDb.getInventoryItems();
+        setInventoryList(invData);
       } catch (err: any) {
         console.error(err);
         setError(err.message || 'Error al cargar los datos de la orden');
@@ -223,6 +243,45 @@ export const OrderForm: React.FC = () => {
       console.error('Error deleting image:', err);
       setError(err.message || 'Error al eliminar la imagen de referencia');
     }
+  };
+
+  const handleAddMaterial = () => {
+    if (!materialSelectId) return;
+    const item = inventoryList.find(i => i.id === materialSelectId);
+    if (!item) return;
+
+    if (materialQty <= 0) {
+      alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    // Check stock: total available = item.stock + initial quantity in this order (if any)
+    const alreadySelected = selectedMaterials.find(m => m.itemId === materialSelectId);
+    const initialQty = initialMaterials.find(m => m.itemId === materialSelectId)?.quantity || 0;
+    const totalAvailable = item.stock + initialQty;
+    const proposedQty = (alreadySelected?.quantity || 0) + materialQty;
+
+    if (proposedQty > totalAvailable) {
+      alert(`Stock insuficiente. Solo hay ${totalAvailable} ${item.unit} disponibles en total.`);
+      return;
+    }
+
+    if (alreadySelected) {
+      setSelectedMaterials(prev => prev.map(m => m.itemId === materialSelectId ? { ...m, quantity: m.quantity + materialQty } : m));
+    } else {
+      setSelectedMaterials(prev => [...prev, { itemId: materialSelectId, quantity: materialQty }]);
+    }
+
+    // Temporarily reduce local stock in list
+    setInventoryList(prev => prev.map(i => i.id === materialSelectId ? { ...i, stock: i.stock - materialQty } : i));
+    setMaterialSelectId('');
+    setMaterialQty(1);
+  };
+
+  const handleRemoveMaterial = (itemId: string, qty: number) => {
+    setSelectedMaterials(prev => prev.filter(m => m.itemId !== itemId));
+    // Restore local stock in list
+    setInventoryList(prev => prev.map(i => i.id === itemId ? { ...i, stock: i.stock + qty } : i));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -331,6 +390,29 @@ export const OrderForm: React.FC = () => {
             is_reference: true 
           }]);
         if (dbError) throw dbError;
+      }
+
+      // 4. Sync materials (order items)
+      const initialMap = new Map(initialMaterials.map(m => [m.itemId, m.quantity]));
+      const currentMap = new Map(selectedMaterials.map(m => [m.itemId, m.quantity]));
+
+      // Delete removed
+      for (const [itemId] of initialMap.entries()) {
+        if (!currentMap.has(itemId)) {
+          await inventoryDb.removeOrderItem(orderId, itemId);
+        }
+      }
+
+      // Add or update
+      for (const [itemId, qty] of currentMap.entries()) {
+        if (!initialMap.has(itemId)) {
+          await inventoryDb.addOrderItem(orderId, itemId, qty);
+        } else {
+          const prevQty = initialMap.get(itemId);
+          if (prevQty !== qty) {
+            await inventoryDb.updateOrderItemQuantity(orderId, itemId, qty);
+          }
+        }
       }
 
       // Cleanup revokes
@@ -480,6 +562,79 @@ export const OrderForm: React.FC = () => {
                       </select>
                     </div>
                   )}
+
+                  {/* Material selection and consumption listing */}
+                  <div className="space-y-4 bg-slate-900/40 border border-slate-800/80 p-5 rounded-2xl">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5 font-sans">
+                      <Package className="w-3.5 h-3.5" />
+                      Insumos / Materiales Estimados
+                    </label>
+
+                    {/* Add material row */}
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <select
+                          value={materialSelectId}
+                          onChange={(e) => setMaterialSelectId(e.target.value)}
+                          className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-2 px-3 text-slate-200 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
+                        >
+                          <option value="" className="bg-slate-900">-- Selecciona Material --</option>
+                          {inventoryList.map((item) => (
+                            <option key={item.id} value={item.id} className="bg-slate-900" disabled={item.stock <= 0}>
+                              {item.name} ({item.stock} disponibles)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-20">
+                        <input
+                          type="number"
+                          min={1}
+                          value={materialQty}
+                          onChange={(e) => setMaterialQty(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-2 px-3 text-slate-250 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddMaterial}
+                        disabled={!materialSelectId}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Añadir
+                      </button>
+                    </div>
+
+                    {/* Selected materials list */}
+                    {selectedMaterials.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">No se han planificado insumos para esta orden.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {selectedMaterials.map((mat) => {
+                          const item = inventoryList.find(i => i.id === mat.itemId);
+                          return (
+                            <div key={mat.itemId} className="flex items-center justify-between bg-slate-950/40 border border-slate-800/80 px-3 py-2 rounded-xl text-xs">
+                              <div>
+                                <span className="font-semibold text-slate-200">{item?.name || 'Insumo desconocido'}</span>
+                                <span className="text-slate-500 ml-1.5">({item?.unit})</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-bold text-indigo-400">{mat.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMaterial(mat.itemId, mat.quantity)}
+                                  className="text-slate-500 hover:text-rose-450 p-1 rounded transition-colors cursor-pointer"
+                                  title="Quitar"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Right Column: Reference Images & Map picker */}

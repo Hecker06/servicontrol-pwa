@@ -1,0 +1,34 @@
+================================================================================
+EXPLICACIÓN TÉCNICA: VALIDACIONES Y GEOLOCALIZACIÓN DE CIERRE TÉCNICO
+================================================================================
+
+Este bloque de código, implementado en la vista del técnico (`OrderDetail.tsx`),
+establece las compuertas lógicas de validación para completar un servicio y
+captura las coordenadas GPS finales desde las cuales el técnico reporta el cierre.
+
+FUNCIONAMIENTO PASO A PASO:
+1. **Comprobación de Prerrequisitos Obligatorios**:
+   - Al invocar `handleCompleteOrder()`, el sistema evalúa la longitud del arreglo
+     de evidencias visuales (`evidences.length`). Si es igual a 0, lanza una alerta
+     visual bloqueante y detiene el flujo de ejecución.
+   - De la misma forma, evalúa el campo de comentarios técnicos (`observation`). Si
+     está vacío, interrumpe el proceso. Esto asegura que no existan cierres
+     técnicos vacíos o sin evidencia de soporte.
+
+2. **Consulta al GPS del Dispositivo Móvil**:
+   - Invoca la API nativa de geolocalización del navegador `navigator.geolocation.getCurrentPosition()`.
+   - Esta llamada solicita permisos de ubicación al sistema operativo móvil.
+   - Si el técnico los concede, el callback del navegador retorna las coordenadas
+     de alta precisión (latitud y longitud) del teléfono del técnico.
+
+3. **Persistencia de Geolocalización y Cambio de Estado**:
+   - Envía las coordenadas finales a la tabla `locations` de Supabase vinculándolas
+     a la orden de servicio con la bandera `is_target = false` (ubicación real de cierre).
+   - Finalmente, realiza una petición de actualización para cambiar el estado (`status`)
+     de la orden a 'Completada'.
+
+BENEFICIO OPERATIVO:
+Resuelve el aseguramiento de calidad del trabajo técnico, garantizando que todo
+servicio finalizado cuente obligatoriamente con fotos, descripción escrita de la
+reparación y la coordenada geográfica real del cierre de auditoría.
+================================================================================

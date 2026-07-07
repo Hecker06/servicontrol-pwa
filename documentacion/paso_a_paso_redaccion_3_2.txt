@@ -1,0 +1,340 @@
+================================================================================
+          GUÍA DE REDACCIÓN TÉCNICA PASO A PASO PARA EL APARTADO 3.2
+  ESTRICTAMENTE ALINEADA A LOS CRITERIOS DE REDACCIÓN DE ESTADÍAS PROFESIONALES
+================================================================================
+
+Este documento ha sido generado para estructurar y redactar el apartado:
+"3.2 Implementación de la mejora del sistema"
+de acuerdo a las directrices del PDF "CRITERIOS DE APOYO PARA REDACTAR 3.2.pdf".
+
+Cumple rigurosamente con:
+1. Diagnóstico técnico detallado de necesidades (contextualizando el rol del jefe/gerente y de los técnicos sin nombrarlos explícitamente).
+2. Valoración de alcance (qué se pudo alcanzar con el proyecto y qué no, dadas las condiciones).
+3. Tablas estructuradas de Requerimientos Funcionales y No Funcionales.
+4. Propuesta de solución (mención clara de los elementos que contiene, sin anticipar beneficios).
+5. Desglose detallado de los elementos de la propuesta (Subsecciones 3.2.x), estructurados en tres partes obligatorias:
+   a) Explicación técnica: Qué es, cómo funciona, qué involucra y sus características.
+   b) Pasos de creación y herramientas: Procedimiento exacto, herramientas usadas y evidencias visuales a incluir.
+   c) Funcionamiento: Comportamiento mecánico de los elementos descritos (sin mencionar beneficios).
+
+================================================================================
+                    TEXTO Y ESTRUCTURA PROPUESTA PARA EL CAPÍTULO
+================================================================================
+
+3.2 EXPLICACIÓN DETALLADA DE LA IMPLEMENTACIÓN DE LA MEJORA AL ÁREA
+
+Antes de iniciar la descripción técnica del sistema implementado, se realizó un 
+diagnóstico detallado del área de gestión y mantenimiento de infraestructura para 
+identificar los cuellos de botella y las necesidades operativas de sus usuarios.
+
+En primer lugar, el personal encargado de la supervisión e inspección general de la 
+infraestructura requiere conocer de manera precisa el estado de los reportes de falla, 
+saber qué técnico ha sido asignado a cada tarea y contar con mecanismos de auditoría 
+geográfica para validar que las reparaciones se ejecuten físicamente en los puntos 
+especificados. Adicionalmente, este personal administrativo necesita recopilar reportes 
+consolidados de las actividades periódicas para el control interno de calidad.
+
+En segundo lugar, el personal operativo en campo (técnicos de mantenimiento) necesita 
+recibir sus asignaciones de trabajo diarias en dispositivos móviles de forma directa, 
+visualizar indicaciones sobre las tareas, y registrar evidencias fotográficas del antes 
+y después del servicio. Estos operarios frecuentemente trabajan en sótanos, zonas de 
+laboratorio o exteriores con baja conectividad de red celular, por lo que requieren 
+mecanismos que impidan la pérdida de datos si la cobertura se interrumpe momentáneamente.
+
+-- VALORACIÓN Y DISCERNIMIENTO DE ALCANCE --
+Tras el análisis de necesidades, se valoró el alcance del proyecto considerando las 
+limitaciones de infraestructura y presupuesto disponibles. Se determinó que, debido a 
+los altos costos asociados con APIs comerciales de mapas en tiempo real (como Google 
+Maps API) y al consumo excesivo de batería de las aplicaciones que rastrean la 
+ubicación en segundo plano de manera continua, no sería viable realizar un seguimiento 
+del técnico en tiempo real por trayectos. En su lugar, se discernió que es viable y 
+altamente eficiente registrar las coordenadas GPS precisas del dispositivo móvil 
+únicamente en dos momentos críticos: el inicio del servicio y el cierre técnico del 
+mismo, cruzando esta información con la georreferenciación programada por el 
+administrador a través de la herramienta cartográfica libre Leaflet y OpenStreetMap.
+
+Para sistematizar los requerimientos técnicos identificados, se construyeron las 
+siguientes tablas de requerimientos funcionales y no funcionales del sistema:
+
+Tabla 1. Requerimientos Funcionales de ServiControl PWA
+--------------------------------------------------------------------------------
+ID    | Requerimiento Funcional                    | Prioridad | Criterio de Aceptación
+--------------------------------------------------------------------------------
+RF1   | Autenticación de usuarios por roles        | Alta      | El inicio de sesión define si carga el panel de Admin o de Técnico.
+RF2   | CRUD de registros de Clientes              | Alta      | Almacenar clientes para asociarlos a las órdenes de trabajo.
+RF3   | CRUD de Órdenes de Servicio                | Alta      | Formulario para crear y editar trabajos asignándoles técnico y fecha.
+RF4   | Geolocalización del Destino                | Alta      | El administrador programa las coordenadas del sitio usando un mapa.
+RF5   | Asignación de Técnico en Orden             | Alta      | Vincula un perfil de técnico con un servicio específico.
+RF6   | Monitoreo de Estados (Dashboard Admin)     | Media     | Panel administrativo que agrupa servicios por su estado actual.
+RF7   | Lista de Órdenes Asignadas (Técnico)      | Alta      | Vista restringida al técnico con sus tareas programadas vigentes.
+RF8   | Registro GPS Real de Trabajo               | Alta      | Captura latitud y longitud del dispositivo al iniciar y al cerrar.
+RF9   | Registro Fotográfico de Evidencias         | Alta      | Envío obligatorio de fotografías tomadas en el sitio de trabajo.
+RF10  | Cierre Técnico con observaciones           | Alta      | Actualiza el estado a "Completada" solicitando comentarios y fotos.
+--------------------------------------------------------------------------------
+
+Tabla 2. Requerimientos No Funcionales de ServiControl PWA
+--------------------------------------------------------------------------------
+ID    | Requerimiento No Funcional                 | Prioridad | Criterio de Aceptación
+--------------------------------------------------------------------------------
+RNF1  | PWA Instalable y Responsiva                | Alta      | La app se instala en smartphones y adapta su UI a pantallas táctiles.
+RNF2  | Seguridad a Nivel de Fila (RLS)            | Alta      | Restricción de base de datos para que los técnicos solo vean lo propio.
+RNF3  | Tiempos de Respuesta del Servidor          | Media     | Carga de datos de históricos y tableros en menos de 2 segundos.
+RNF4  | Cifrado de Comunicaciones                  | Alta      | Empleo de protocolo seguro HTTPS y resguardo de claves en archivo .env.
+RNF5  | Soporte Offline de la Interfaz             | Alta      | El Service Worker almacena recursos estáticos para el modo fuera de línea.
+--------------------------------------------------------------------------------
+
+-- PROPUESTA DE SOLUCIÓN --
+La propuesta de solución para solventar estas necesidades comprende los siguientes 
+elementos de software desarrollados en el marco del proyecto:
+1. Una Base de Datos Relacional hospedada en Supabase bajo el motor PostgreSQL, con 
+   mecanismos de automatización y seguridad mediante lenguaje procedimental (PL/pgSQL) 
+   y políticas de seguridad RLS.
+2. Un Entorno Frontend modular estructurado sobre React, TypeScript y el empaquetador Vite.
+3. Un Proveedor de Contexto de Autenticación y Enrutador Seguro de perfiles de usuario.
+4. Un Panel de Administración compuesto por formularios georreferenciados (con mapas 
+   Leaflet e integración de geocodificación inversa) y monitoreo de estados de órdenes.
+5. Un Panel del Técnico optimizado para móviles con integración de la API nativa de 
+   geolocalización de HTML5 y captura directa de cámara fotográfica.
+6. Un Service Worker y Manifiesto de Aplicación Web Progresiva (PWA) para garantizar 
+   la instalabilidad del cliente y persistencia offline.
+
+A continuación, se detalla el proceso de implementación paso a paso de cada uno de 
+estos elementos:
+
+--------------------------------------------------------------------------------
+3.2.1 DISEÑO DETALLADO DE LA BASE DE DATOS EN SUPABASE (POSTGRESQL)
+--------------------------------------------------------------------------------
+
+a) Explicación técnica del elemento:
+La persistencia de datos se resolvió mediante Supabase, utilizando el motor relacional 
+PostgreSQL. El esquema consta de seis tablas relacionadas mediante llaves foráneas:
+- `profiles`   : Contiene metadatos de los usuarios registrados y su rol ('admin' o 'tecnico').
+- `clients`    : Almacena información de los clientes asociados a las órdenes de trabajo.
+- `service_orders`: Entidad principal con la descripción, fecha programada y estados.
+- `evidences`  : Almacena las URLs de imágenes, indicando si son del admin o del técnico.
+- `locations`  : Almacena las coordenadas geográficas asociadas a las órdenes de servicio.
+- `observations`: Registra los comentarios técnicos de cierre redactados por el técnico.
+
+Para la automatización, se definió una función PL/pgSQL disparada por el evento `INSERT` 
+en el esquema interno de Supabase Auth, permitiendo la clonación e inserción directa 
+del perfil en `profiles` con su respectivo rol de forma inmediata.
+
+La seguridad de los datos a nivel de tabla se configuró con políticas RLS (Row Level 
+Security). RLS evalúa la identidad de la sesión a través de la función `auth.uid()`, 
+bloqueando cualquier petición de lectura o escritura que no provenga de un administrador 
+o del técnico asignado a la orden respectiva.
+
+b) Pasos de creación, herramientas y soporte visual:
+1. Creación del proyecto en la consola web de Supabase.
+2. Acceso al editor SQL de Supabase para ejecutar la sentencia DDL de creación de tablas.
+3. Creación de la función disparadora `handle_new_user` y el disparador `on_auth_user_created` 
+   en Postgres para la sincronización automática de perfiles.
+4. Habilitación de la seguridad RLS en las seis tablas mediante comandos `ALTER TABLE`.
+5. Creación de políticas de acceso `CREATE POLICY` diferenciadas por rol de usuario.
+   - Herramienta empleada: Editor de Consultas SQL de Supabase y políticas RLS asistidas.
+   * Evidencia visual a incluir: Captura de pantalla de la estructura de tablas en el 
+     esquema público en Supabase, y captura de la interfaz de políticas de seguridad RLS 
+     activas en la tabla `service_orders`.
+
+c) Funcionamiento del elemento:
+El motor relacional procesa transacciones SQL. Cuando un usuario se autentica en la app, 
+el cliente web inicializa la sesión. Cualquier consulta que envíe el cliente al backend 
+pasa por el motor RLS de PostgreSQL; si el rol es 'tecnico', el motor de BD intercepta 
+la consulta de selección de órdenes y aplica implícitamente el filtro `technician_id = auth.uid()`, 
+retornando solo sus registros correspondientes. Si un usuario sin rol administrativo 
+intenta realizar un cambio en la tabla `clients`, la base de datos rechaza la transacción.
+
+--------------------------------------------------------------------------------
+3.2.2 ARQUITECTURA GENERAL Y CONFIGURACIÓN DEL CÓDIGO FUENTE (VITE + REACT + TS)
+--------------------------------------------------------------------------------
+
+a) Explicación técnica del elemento:
+La aplicación frontend se construyó en base a Vite como empaquetador de módulos 
+por su velocidad, React como biblioteca de interfaz de usuario de componentes 
+reactivos, y TypeScript para asegurar el tipado fuerte. La arquitectura es de 
+código limpio, dividida en directorios de responsabilidades claras:
+- `src/components/`: Componentes globales de UI.
+- `src/context/`   : Gestores de estado compartido.
+- `src/lib/`       : Clientes de servicios externos.
+- `src/pages/`     : Pantallas e interfaces específicas segmentadas por rol.
+
+El compilador de TypeScript se configuró con la opción `"verbatimModuleSyntax": true`, 
+la cual obliga a especificar con `import type` la importación de interfaces y tipos. 
+Esto optimiza el peso final del bundle compilado reduciendo código innecesario.
+
+b) Pasos de creación, herramientas y soporte visual:
+1. Creación del andamiaje del proyecto ejecutando `npm create vite@latest` en consola.
+2. Selección del template de React con TypeScript.
+3. Instalación de dependencias del proyecto (Supabase SDK, Leaflet, Lucide React, Tailwind).
+4. Configuración del archivo `.env` en la raíz con las claves de acceso de Supabase.
+5. Edición del archivo de configuración `tsconfig.json` e incorporación de la regla 
+   `verbatimModuleSyntax`.
+   - Herramientas empleadas: Visual Studio Code, Node.js y npm.
+   * Evidencia visual a incluir: Captura de pantalla del árbol de directorios del 
+     proyecto abierto en el editor de código, y fragmento de código de la configuración 
+     en `vite.config.ts` o `tsconfig.json`.
+
+c) Funcionamiento del elemento:
+Durante el desarrollo local, Vite ejecuta un servidor con soporte HMR (Hot Module Replacement) 
+que recarga únicamente los componentes modificados. Al compilar para producción, el 
+optimizador analiza el árbol de imports de TypeScript, elimina tipos e interfaces vacías, 
+minifica el código Javascript y genera recursos estáticos en la carpeta `dist/` listos 
+para ser servidos.
+
+--------------------------------------------------------------------------------
+3.2.3 SISTEMA DE AUTENTICACIÓN Y CONTEXTO GLOBAL DE ACCESO (AUTHCONTEXT.TSX)
+--------------------------------------------------------------------------------
+
+a) Explicación técnica del elemento:
+El control de la sesión activa recae en un proveedor de contexto de React denominado 
+`AuthContext.tsx`. Este componente se encarga de envolver a toda la aplicación para 
+escuchar cambios en el token JWT provisto por Supabase Auth. Adicionalmente, recupera 
+de la base de datos el perfil extendido del usuario para determinar su rol ('admin' 
+o 'tecnico').
+Para proteger las páginas de intrusiones, se implementó el componente 
+`ProtectedRoute.tsx`, el cual evalúa si el usuario autenticado tiene el rol requerido 
+para visualizar la ruta actual.
+
+b) Pasos de creación, herramientas y soporte visual:
+1. Creación del archivo `src/context/AuthContext.tsx`.
+2. Programación de la suscripción al estado de autenticación a través del método 
+   `supabase.auth.onAuthStateChange`.
+3. Inserción de lógica asíncrona para consultar la tabla `profiles` mediante `supabase.from('profiles')` 
+   en cuanto se valida un inicio de sesión exitoso.
+4. Programación del archivo `src/components/ProtectedRoute.tsx` definiendo las 
+   validaciones de rol permitidas.
+5. Vinculación de las rutas protegidas en `src/App.tsx`.
+   - Herramientas empleadas: React Context API, React Router DOM y Supabase Auth SDK.
+   * Evidencia visual a incluir: Diagrama de flujo lógico de inicio de sesión o fragmento 
+     de código del componente `ProtectedRoute.tsx` validando los roles.
+
+c) Funcionamiento del elemento:
+Al cargar la aplicación, `AuthContext` ejecuta una validación local de token. Si no 
+detecta sesión, el enrutador bloquea el renderizado de la UI y redirige al usuario a la 
+pantalla `/login`. Al ingresar credenciales correctas, el SDK notifica el cambio, 
+se obtiene el rol del perfil, y `ProtectedRoute` permite mostrar el árbol de componentes 
+hijos. Si un técnico intenta escribir `/admin/dashboard` en la URL del navegador, 
+`ProtectedRoute` detecta la discrepancia de roles y lo devuelve automáticamente al 
+dashboard de técnicos.
+
+--------------------------------------------------------------------------------
+3.2.4 PANEL DE ADMINISTRACIÓN Y FORMULARIO DE ÓRDENES CON GEORREFERENCIACIÓN
+--------------------------------------------------------------------------------
+
+a) Explicación técnica del elemento:
+El módulo de administración incluye un dashboard con indicadores en tiempo real (KPIs) 
+que informan sobre la cantidad de órdenes "Pendientes", "Asignadas", "En curso" y 
+"Completadas".
+La creación de órdenes se gestiona en `OrderForm.tsx`, el cual cuenta con un selector 
+cartográfico interactivo construido con Leaflet. Al hacer clic sobre el mapa en el 
+punto exacto donde debe realizarse el servicio, el sistema captura las coordenadas de 
+latitud y longitud y realiza una petición HTTP de geocodificación inversa hacia la 
+API libre de OpenStreetMap Nominatim. Esto permite que el administrador vea y guarde 
+la dirección urbana legible en el campo `address`.
+
+b) Pasos de creación, herramientas y soporte visual:
+1. Creación de la pantalla de Dashboard administrativo implementando filtros acumulativos 
+   por estado y texto de búsqueda.
+2. Programación del formulario `OrderForm.tsx` integrando el visor Leaflet con 
+   `react-leaflet`.
+3. Configuración del marcador dinámico que actualiza su posición según las pulsaciones 
+   del usuario en pantalla.
+4. Implementación de la consulta a la API Nominatim a través de `fetch` asíncrono para 
+   el autocompletado de direcciones.
+5. Inserción de la orden y la ubicación de destino en Supabase.
+   - Herramientas empleadas: React-Leaflet, OpenStreetMap API y Tailwind CSS.
+   * Evidencia visual a incluir: Captura de pantalla del formulario de registro de orden 
+     mostrando el mapa Leaflet interactivo con el marcador posicionado y la dirección 
+     autocompletada.
+
+c) Funcionamiento del elemento:
+El administrador abre el formulario de registro de servicios, escribe la descripción y 
+selecciona al cliente y al técnico. Al interactuar con el mapa táctil o con el cursor, 
+el componente captura el evento de clic, obtiene las coordenadas numéricas y dispara 
+la petición HTTP. La API Nominatim responde con un archivo JSON con los datos urbanos. 
+El frontend extrae la calle y número, actualizando el formulario de texto. Al enviar, 
+se inserta la cabecera en `service_orders` y la ubicación marcada en `locations` como 
+punto de destino (`is_target = true`).
+
+--------------------------------------------------------------------------------
+3.2.5 PANEL DE TÉCNICO, CAPTURA DE EVIDENCIAS Y CIERRE CON GPS
+--------------------------------------------------------------------------------
+
+a) Explicación técnica del elemento:
+El panel operativo para técnicos en campo está optimizado para dispositivos móviles. 
+Presenta la lista de órdenes asignadas a su identificador. Al abrir una orden 
+asignada, el técnico dispone de botones interactivos para registrar el avance de la tarea:
+- Botón "Iniciar Servicio": Captura las coordenadas de geolocalización de inicio del 
+  dispositivo mediante la API nativa del navegador.
+- Botón "Cerrar Servicio": Requiere obligatoriamente que el técnico capture una 
+  fotografía del trabajo terminado a través de la cámara del dispositivo móvil y 
+  escriba observaciones del servicio técnico.
+La subida de archivos se realiza en un bucket público de Supabase Storage, enlazando 
+las URLs obtenidas a la tabla `evidences`.
+
+b) Pasos de creación, herramientas y soporte visual:
+1. Diseño de la vista móvil `OrderDetail.tsx` con botones táctiles de gran tamaño.
+2. Integración de la llamada a `navigator.geolocation.getCurrentPosition` para capturar 
+   las coordenadas de ubicación del celular.
+3. Incorporación del campo de selección de archivos con la propiedad `capture="environment"`, 
+   el cual abre directamente la cámara del celular.
+4. Implementación del cargador de archivos binarios al Storage de Supabase mediante 
+   `supabase.storage.from()`.
+5. Lógica de validación previa al envío (el botón de completado permanece deshabilitado 
+   si no se cumple con la foto y las observaciones técnicas).
+   - Herramientas empleadas: HTML5 Geolocation API, HTML5 Camera Capture y Supabase Storage.
+   * Evidencia visual a incluir: Captura de pantalla del dashboard de técnicos en 
+     un emulador móvil mostrando la ficha de orden de servicio, el botón de tomar fotografía 
+     y la carga de la evidencia.
+
+c) Funcionamiento del elemento:
+El técnico ingresa a su panel y selecciona una orden "Asignada". Al presionar 
+"Iniciar Servicio", el navegador solicita permisos de geolocalización, captura el punto 
+GPS del dispositivo y actualiza el estado a "En progreso". Al finalizar las tareas, 
+el técnico presiona "Tomar Foto", el navegador móvil activa la cámara trasera física, 
+se captura la imagen y se sube automáticamente al storage, guardando la URL en la tabla 
+`evidences`. El técnico redacta sus comentarios de cierre y presiona "Completar Servicio"; 
+el sistema valida las evidencias en el cliente, toma una segunda lectura de coordenadas 
+GPS, inserta la ubicación de cierre técnico (`is_target = false`) y actualiza el estado 
+a "Completada".
+
+--------------------------------------------------------------------------------
+3.2.6 CONFIGURACIÓN DE PWA Y SOPORTE OFFLINE (VITE PWA PLUGIN)
+--------------------------------------------------------------------------------
+
+a) Explicación técnica del elemento:
+La aplicación se empaqueta como Aplicación Web Progresiva (PWA) para garantizar que 
+pueda ser instalable en sistemas operativos Android y iOS directamente desde el 
+navegador sin pasar por las tiendas de aplicaciones.
+Esto involucra el uso del plugin `vite-plugin-pwa` para registrar un Service Worker 
+en el navegador del cliente. Este Service Worker intercepta las peticiones de red y 
+almacena en caché interna (precache) los activos estáticos que componen el bundle web 
+(HTML, JS, CSS, e imágenes). Adicionalmente, el manifiesto web (`manifest.json`) 
+describe la identidad gráfica del sistema.
+
+b) Pasos de creación, herramientas y soporte visual:
+1. Instalación del paquete `vite-plugin-pwa`.
+2. Configuración en `vite.config.ts` detallando la estrategia de registro del service 
+   worker (`registerType: 'autoUpdate'`).
+3. Declaración de las propiedades del manifiesto (`name`, `short_name`, `theme_color`, 
+   `background_color`, `display: 'standalone'`, e íconos en formato PNG).
+4. Configuración del Service Worker para almacenar localmente los recursos estáticos 
+   de compilación.
+   - Herramientas empleadas: Vite PWA Plugin, Service Workers API, Web App Manifest.
+   * Evidencia visual a incluir: Captura de la consola de desarrollo de Chrome (Application tab) 
+     donde se muestre el Service Worker registrado con éxito y activo, y captura del 
+     menú de instalación de la aplicación en el dispositivo móvil.
+
+c) Funcionamiento del elemento:
+Al acceder al dominio del sistema por primera vez, el navegador descarga y registra 
+el Service Worker en segundo plano. A partir de ese momento, el Service Worker asume 
+el control del tráfico de red de la pestaña: si el dispositivo móvil pierde conexión a 
+internet por completo e intenta recargar la app, el Service Worker intercepta la petición, 
+lee los recursos estáticos guardados en el almacenamiento local de caché y carga la 
+interfaz completa del sistema con normalidad. Asimismo, el navegador web móvil lee el 
+manifiesto de la app y habilita una ventana interactiva sugiriendo al usuario 
+"Agregar ServiControl a la pantalla de inicio".
+
+================================================================================
+                                FIN DE LA GUÍA
+================================================================================

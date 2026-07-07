@@ -1,0 +1,74 @@
+================================================================================
+PROMPT MODULAR PARA CHATGPT: REDACCIÓN DE CAPÍTULO 3.2 (SERVICONTROL PWA)
+================================================================================
+
+Instrucciones para el alumno:
+1. Sube a ChatGPT este prompt junto con el contenido del archivo "manual_tecnico_maestro.txt".
+2. Si es posible, adjunta también los documentos de "Metodología", "Criterios de Apoyo" y el "Anteproyecto" para que actúen como referencia directa en su base de conocimiento.
+
+---
+[INICIO DEL PROMPT]
+Actúa como un asesor de tesis y redactor académico de nivel Ingeniería en Tecnologías de la Información. Tu objetivo es generar la redacción del apartado "3.2 Implementación de la mejora del sistema" para el reporte oficial de estadías, detallando de forma 100% técnica el funcionamiento de la aplicación "ServiControl PWA" a partir de la Base de Datos.
+
+Para la elaboración de este documento, debes guiarte estrictamente por las siguientes tres directrices metodológicas:
+
+--------------------------------------------------------------------------------
+DIRECTRICES METODOLÓGICAS Y DE REDACCIÓN (DE APEGO OBLIGATORIO)
+--------------------------------------------------------------------------------
+1. **Reglas de Redacción e Impersonalidad (Apego Estricto a Metodología UTTN)**:
+   - **Forma Impersonal**: El texto debe estar redactado enteramente en tercera persona del singular o en voz pasiva impersonal (ej. "Se realiza el diseño", "Se inicializa el cliente", "Se ejecuta la verificación"). Está estrictamente prohibido usar la primera persona del plural o singular (NO usar: "instalamos", "programamos", "diseñé").
+   - **Tiempo Presente**: Todo el documento debe escribirse en tiempo presente (ej. "Se construye el esquema", "Se conecta a la base de datos", "Se define la ruta"). Los hechos del sistema son reales y operativos hoy en día. Está estrictamente prohibido usar tiempo futuro para describir el sistema (NO usar: "se creará", "se implementará", "funcionará").
+   - **Formato de Títulos y Encabezados**: Se escribe solo la primera letra en mayúscula y el resto en minúscula (ej. "Diseño detallado de la base de datos" en lugar de "DISEÑO DETALLADO DE LA BASE DE DATOS" o "Diseño Detallado De La Base De Datos").
+   - **Regla de Acrónimos**: La primera vez que menciones un acrónimo técnico, debes escribir primero su significado completo y luego el acrónimo entre paréntesis (ej. "HyperText Markup Language (HTML)", "Row Level Security (RLS)", "Single Page Application (SPA)").
+   - **Sin Cursivas o Negritas en el Texto**: No se permite poner texto en cursiva o negrita, a excepción de los títulos y subtítulos del reporte.
+
+2. **Criterios de Redacción para el Apartado 3.2 (Estructura y Proporción)**:
+   - Sigue detalladamente la estructura de requerimientos (funcionales y no funcionales) presentados en el material técnico de ServiControl.
+   - Describe con rigor los flujos de integración y las decisiones arquitectónicas.
+
+3. **Enfoque de Redacción del Anteproyecto (Referencia Estilística y Técnica)**:
+   - Toma el Anteproyecto como referencia de la profundidad técnica requerida.
+   - **Explicación 100% Técnica, NO un Tutorial**: La explicación del funcionamiento paso a paso a partir de la base de datos no debe estructurarse como un manual de usuario (ej. "haz clic aquí", "presiona este botón", "llena este campo"). Debe explicarse desde la perspectiva de la lógica de programación, el flujo de datos, el ciclo de vida de los componentes, la interacción de las APIs y la persistencia de datos.
+
+--------------------------------------------------------------------------------
+ESTRUCTURA DE REDACCIÓN COMPLETA A GENERAR:
+--------------------------------------------------------------------------------
+Genera el desarrollo detallado de los siguientes temas:
+
+**3.2 Implementación de la mejora del sistema**
+Introducción al desarrollo y despliegue del sistema ServiControl PWA. Presenta las dos tablas del material técnico: Tabla 1 (Requerimientos Funcionales) y Tabla 2 (Requerimientos No Funcionales) con formato de tabla clásico y limpio.
+
+**3.2.1 Diseño detallado de la base de datos en Supabase (PostgreSQL)**
+Explica la estructura lógica y relacional de la base de datos. 
+- Detalla el diccionario de datos y propósito de cada una de las 8 tablas (`profiles`, `clients`, `service_orders`, `evidences`, `locations`, `observations`, `inventory_items`, `order_items`).
+- Incluye el código SQL DDL completo de la creación de las tablas provisto en el manual técnico.
+- Explica detalladamente el funcionamiento y la sintaxis PL/pgSQL de la función y trigger `handle_new_user()`.
+- Explica de forma minuciosa las políticas de seguridad a nivel de fila (RLS) habilitadas en cada tabla, detallando cómo se restringe el acceso de los técnicos a sus propias órdenes y cómo se le otorga acceso total al administrador.
+
+**3.2.2 Arquitectura y estructura del proyecto**
+Describe la arquitectura de la aplicación en React con TypeScript y Vite. Presenta el diagrama de directorios (árbol de archivos) y explica el propósito de cada carpeta (`context`, `components`, `lib`, `pages`). Explica la implicación técnica del compilador de TypeScript con la bandera `verbatimModuleSyntax` activada y la obligatoriedad de la importación explícita de tipos.
+
+**3.2.3 Inicialización y conexión de datos híbrida (Capa de Fallback)**
+Explica técnicamente cómo el archivo `inventoryDb.ts` interactúa con la base de datos.
+- Describe el algoritmo de verificación y detección de tablas remotas de Supabase al cargar la aplicación.
+- Detalla paso a paso cómo funciona el mecanismo de fallback automático a LocalStorage, incluyendo la inicialización del inventario simulado.
+- Explica la lógica transaccional de stock: cómo el sistema valida la disponibilidad física de un material antes de asignarlo, cómo deduce la cantidad en almacén al crear un registro de consumo, y cómo la restituye en caso de eliminación.
+
+**3.2.4 Autenticación de usuarios y control de acceso**
+Explica la implementación de la sesión en el cliente Supabase, el uso del proveedor global `AuthContext.tsx` para sincronizar los perfiles con roles de la base de datos, y cómo el componente `ProtectedRoute.tsx` actúa como middleware en el cliente para restringir rutas en base a roles.
+
+**3.2.5 Módulo de administración y CRUD de inventario**
+Describe la lógica del panel del administrador para la gestión de insumos y el formulario de órdenes. Detalla la integración de mapas de **Leaflet** y cómo el componente captura el evento de clic del mapa y consume la API Nominatim de OpenStreetMap para resolver las coordenadas en una dirección física mediante geocodificación inversa.
+
+**3.2.6 Dashboard administrativo e historial de servicios**
+Describe el funcionamiento del panel de monitoreo, la lógica de filtrado de las tablas y el modal detallado de auditoría (el cual compara en pantalla el marcador destino vs. la posición real GPS del técnico en sitio al cerrar el trabajo).
+
+**3.2.7 Panel del técnico en campo y cierre de órdenes**
+Explica la interfaz responsiva del técnico. Detalla el flujo de geolocalización al iniciar la orden y cómo el botón de evidencias interactúa con la API de la cámara nativa del celular. Detalla las reglas lógicas que validan y bloquean el cierre de órdenes si el técnico no ha cumplido con los requisitos obligatorios de fotos y observaciones redactadas.
+
+**3.2.8 Mecanismos de disponibilidad PWA e instalación**
+Explica técnicamente la configuración de `vite-plugin-pwa` para el empaquetado del Service Worker, la estrategia de caché local de archivos estáticos y las propiedades del manifiesto para su instalación nativa.
+
+*Genera el reporte de forma exhaustiva, completa, hilada y sin saltarte detalles técnicos ni código.*
+[FIN DEL PROMPT]
+---

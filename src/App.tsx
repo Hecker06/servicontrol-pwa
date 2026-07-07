@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { OrderForm } from './pages/admin/OrderForm';
 import { Clients } from './pages/admin/Clients';
+import { Inventory } from './pages/admin/Inventory';
 import { TechDashboard } from './pages/tech/Dashboard';
 import { TechOrderDetail } from './pages/tech/OrderDetail';
 
@@ -72,6 +73,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Clients />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/inventory"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Inventory />
               </ProtectedRoute>
             }
           />
