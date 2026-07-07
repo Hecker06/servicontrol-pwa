@@ -280,6 +280,51 @@ export const TechOrderDetail: React.FC = () => {
     );
   };
 
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1280;
+          const MAX_HEIGHT = 1280;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              resolve(blob || file);
+            },
+            'image/jpeg',
+            0.75
+          );
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = () => resolve(file);
+    });
+  };
+
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
@@ -293,14 +338,20 @@ export const TechOrderDetail: React.FC = () => {
     setError(null);
 
     try {
+      // Compresión de imagen en el cliente
+      const compressedBlob = await compressImage(file);
+      const compressedFile = new File([compressedBlob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+
       // 1. Upload to Supabase Storage Bucket
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${order.id}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const fileName = `${order.id}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.jpg`;
       const filePath = fileName;
 
       const { error: uploadError } = await supabase.storage
         .from('evidences')
-        .upload(filePath, file, {
+        .upload(filePath, compressedFile, {
           cacheControl: '3600',
           upsert: false
         });
@@ -624,7 +675,6 @@ export const TechOrderDetail: React.FC = () => {
                       <input
                         type="file"
                         accept="image/*"
-                        capture="environment" // Mobile camera trigger
                         ref={fileInputRef}
                         onChange={handleImageUpload}
                         className="hidden"
