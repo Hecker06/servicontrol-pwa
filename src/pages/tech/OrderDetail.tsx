@@ -66,6 +66,12 @@ export const TechOrderDetail: React.FC = () => {
   const [targetAddress, setTargetAddress] = useState<string | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
+  const [geoErrorModal, setGeoErrorModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    instructions: string[];
+  } | null>(null);
 
   const getAddressFromCoords = async (lat: number, lon: number): Promise<string> => {
     try {
@@ -247,6 +253,72 @@ export const TechOrderDetail: React.FC = () => {
     }
   };
 
+  const handleGeoSuccess = async (position: GeolocationPosition) => {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+    setCoords({
+      latitude: lat,
+      longitude: lng,
+    });
+
+    // Reverse geocoding
+    const resolvedAddress = await getAddressFromCoords(lat, lng);
+    setAddress(resolvedAddress);
+
+    setLocLoading(false);
+  };
+
+  const handleGeoError = (err: GeolocationPositionError) => {
+    setLocLoading(false);
+    let title = 'Error de Geolocalización';
+    let message = 'No se pudo determinar tu posición geográfica actual.';
+    let instructions: string[] = [];
+
+    switch (err.code) {
+      case err.PERMISSION_DENIED:
+        title = 'Permisos de Ubicación Denegados';
+        message = 'La aplicación no tiene permisos para acceder a tu ubicación GPS.';
+        instructions = [
+          'Ve a los ajustes de tu navegador o de tu teléfono móvil.',
+          'Permite el acceso a la ubicación para este sitio web.',
+          'Recarga la página e intenta de nuevo.'
+        ];
+        break;
+      case err.POSITION_UNAVAILABLE:
+        title = 'GPS o Sensor Inactivo';
+        message = 'El sensor de geolocalización de tu dispositivo no está respondiendo.';
+        instructions = [
+          'Asegúrate de tener encendido el GPS (Ubicación) en la barra de notificaciones.',
+          'Si estás en interiores, acércate a una ventana para mejorar la recepción satelital.',
+          'Verifica que tu dispositivo tenga conexión activa a internet.'
+        ];
+        break;
+      case err.TIMEOUT:
+        title = 'Tiempo de Espera Agotado';
+        message = 'Se superó el tiempo máximo de espera para obtener las coordenadas satelitales.';
+        instructions = [
+          'La señal GPS es demasiado débil en este momento o estás bajo techo.',
+          'Activa el WiFi o datos móviles para ayudar a triangular tu posición.',
+          'Presiona el botón de obtener ubicación de nuevo.'
+        ];
+        break;
+      default:
+        instructions = [
+          'Verifica la configuración de geolocalización de tu dispositivo.',
+          'Intenta reiniciar el navegador web.'
+        ];
+        break;
+    }
+
+    setGeoErrorModal({
+      show: true,
+      title,
+      message,
+      instructions
+    });
+    setLocError(`${title}: ${message}`);
+  };
+
   const getGeolocation = () => {
     if (!navigator.geolocation) {
       setLocError('Geolocalización no soportada por este navegador');
@@ -256,27 +328,25 @@ export const TechOrderDetail: React.FC = () => {
     setLocLoading(true);
     setLocError(null);
 
+    // Intentar primero con alta precisión (GPS)
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setCoords({
-          latitude: lat,
-          longitude: lng,
-        });
-
-        // Reverse geocoding
-        const resolvedAddress = await getAddressFromCoords(lat, lng);
-        setAddress(resolvedAddress);
-
-        setLocLoading(false);
+        handleGeoSuccess(position);
       },
       (err) => {
-        console.warn('Geolocation error:', err);
-        setLocError('No se pudo obtener la ubicación. Activa el GPS y otorga permisos.');
-        setLocLoading(false);
+        console.warn('High accuracy geolocation failed, trying low accuracy fallback...', err);
+        // Si falla por señal o tiempo, reintentar con baja precisión (celdas/WiFi)
+        navigator.geolocation.getCurrentPosition(
+          async (fallbackPosition) => {
+            handleGeoSuccess(fallbackPosition);
+          },
+          (fallbackErr) => {
+            handleGeoError(fallbackErr);
+          },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+        );
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     );
   };
 
@@ -876,6 +946,34 @@ export const TechOrderDetail: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
+        )}
+        {geoErrorModal?.show && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm z-50 p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 space-y-4">
+              <div className="flex items-center gap-3 text-amber-500">
+                <AlertTriangle className="w-8 h-8 flex-shrink-0" />
+                <h3 className="text-base font-bold text-slate-100">{geoErrorModal.title}</h3>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">{geoErrorModal.message}</p>
+              
+              <div className="bg-slate-950/60 border border-slate-850 p-3.5 rounded-xl space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Instrucciones para solucionar:</p>
+                <ul className="list-disc pl-4 text-xs text-slate-350 space-y-1.5 leading-relaxed">
+                  {geoErrorModal.instructions.map((inst, i) => (
+                    <li key={i}>{inst}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setGeoErrorModal(null)}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         )}
       </div>
